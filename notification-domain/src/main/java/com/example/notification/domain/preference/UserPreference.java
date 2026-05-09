@@ -113,4 +113,9 @@ public final class UserPreference {
         return new UserPreference(
                 recipientId, allowedByKind, preferredChannels, quietHours, timezone);
     }
+
+    public UserPreference withTimezone(ZoneId timezone) {
+        return new UserPreference(
+                recipientId, allowedByKind, preferredChannels, quietHours, timezone);
+    }
 }
