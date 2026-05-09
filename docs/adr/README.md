@@ -12,6 +12,7 @@
 - [ADR-0005 사용자 선호도 — 채널 우선순위 / opt-out / 방해금지](0005-user-preference-priority.md)
 - [ADR-0006 Rate limit — 사용자당 채널별 token bucket](0006-rate-limit-token-bucket.md)
 - [ADR-0007 Vendor adapter abstraction — 공통 port 1개](0007-vendor-adapter-port.md)
+- [ADR-0008 HikariCP 명시 튜닝 + leak detection](0008-hikaricp-tuning.md)
 
 ## 작성 양식
 

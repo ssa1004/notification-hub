@@ -9,6 +9,22 @@ spring:
     username: sa
     password:
     driver-class-name: org.h2.Driver
+    hikari:
+      # 산정 근거: 채널 4종 worker (PUSH/EMAIL/SMS/KAKAO) × 평균 동시 처리 4 + Outbox relay 2
+      # + REST 동시 요청 여유분 ~ 20. virtual thread 라도 JDBC 는 OS thread 점유.
+      maximum-pool-size: 20
+      # 평시 idle 5개 유지 — 갑작스런 트래픽에 신규 connection 생성 latency 회피
+      minimum-idle: 5
+      # vendor → DB 응답 < 100ms 가정. 3s 안에 connection 못 받으면 fail-fast → 호출 측에 빨리 알림
+      connection-timeout: 3000
+      # connection 유효 수명 — DB 측 wait_timeout / firewall idle close 보다 짧게 설정
+      # PostgreSQL 기본 idle_in_transaction_session_timeout 30분 < 우리 29분 < OK
+      max-lifetime: 1740000
+      # idle connection 수명 — minimum-idle 보다 큰 connection 만 회수
+      idle-timeout: 600000
+      # connection leak (close 누락) 30s 넘으면 stack trace 로그. 운영 누수 추적용
+      leak-detection-threshold: 30000
+      pool-name: notification-hub-pool
   jpa:
     hibernate:
       ddl-auto: validate
@@ -120,3 +136,29 @@ spring:
     username: ${DB_USER:notification}
     password: ${DB_PASSWORD:notification}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # prod 는 동일 베이스에 실 운영용 환경 변수 override 위주 — 풀 크기는 외부 ENV 로 노출
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 3000
+      max-lifetime: 1740000
+      idle-timeout: 600000
+      leak-detection-threshold: 30000
+      pool-name: notification-hub-pool
+
+---
+# test 프로파일 — Testcontainers / 단위 통합용. leak detection 끔 (테스트는 종료 시점에
+# Spring context tear-down 이 connection close 보다 늦으면 false positive 가 시끄러움).
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000
+      max-lifetime: 1740000
+      idle-timeout: 600000
+      leak-detection-threshold: 0
+      pool-name: notification-hub-pool-test
