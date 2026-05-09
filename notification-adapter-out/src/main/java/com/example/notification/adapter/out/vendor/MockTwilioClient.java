@@ -4,6 +4,8 @@ import com.example.notification.application.port.out.DeliveryGateway;
 import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.delivery.DeliveryAttempt;
 import io.github.resilience4j.retry.annotation.Retry;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import lombok.extern.slf4j.Slf4j;
@@ -24,10 +26,26 @@ public class MockTwilioClient implements DeliveryGateway {
     }
 
     @Override
-    @Retry(name = "vendorTwilio")
+    @Retry(name = "twilio")
     public String dispatch(DeliveryAttempt attempt) {
         if (ThreadLocalRandom.current().nextDouble() < failureRate) {
-            throw new VendorTransientException("Twilio transient");
+            int kind = ThreadLocalRandom.current().nextInt(3);
+            switch (kind) {
+                case 0 -> {
+                    log.warn(
+                            "[MockTwilioClient] 영구 오류 (Invalid 'To' Number) attemptId={}",
+                            attempt.id());
+                    throw new VendorPermanentException("Twilio Invalid To Number");
+                }
+                case 1 -> {
+                    log.warn("[MockTwilioClient] 일시 오류 (5xx) attemptId={}", attempt.id());
+                    throw new VendorTransientException("Twilio 5xx");
+                }
+                default -> {
+                    log.warn("[MockTwilioClient] 네트워크 오류 attemptId={}", attempt.id());
+                    throw new UncheckedIOException(new IOException("Twilio connection reset"));
+                }
+            }
         }
         if (attempt.renderedBody().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 90) {
             log.info(
