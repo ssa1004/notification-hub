@@ -183,6 +183,15 @@ spring:
       leak-detection-threshold: 30000
       pool-name: notification-hub-pool
 
+webhook:
+  # vendor 별 HMAC-SHA256 서명 secret. 운영에서는 KMS / Vault 로 주입 권장 (env 평문은 임시).
+  # 누군가 콜백 URL 만 알아도 가짜 "전송 성공" 마킹을 못 하게 하는 핵심 안전장치.
+  secrets:
+    fcm: ${WEBHOOK_SECRET_FCM:}
+    ses: ${WEBHOOK_SECRET_SES:}
+    twilio: ${WEBHOOK_SECRET_TWILIO:}
+    kakao: ${WEBHOOK_SECRET_KAKAO:}
+
 ---
 # test 프로파일 — Testcontainers / 단위 통합용. leak detection 끔 (테스트는 종료 시점에
 # Spring context tear-down 이 connection close 보다 늦으면 false positive 가 시끄러움).
