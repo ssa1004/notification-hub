@@ -38,4 +38,17 @@ public class JpaDeviceTokenRepository implements DeviceTokenRepository {
     public Optional<DeviceToken> findByToken(String token) {
         return jpa.findByToken(token).map(DeviceTokenMapper::toDomain);
     }
+
+    @Override
+    public void deactivateByToken(String token) {
+        jpa.findByToken(token)
+                .ifPresent(
+                        e -> {
+                            DeviceToken d = DeviceTokenMapper.toDomain(e);
+                            if (d.isActive()) {
+                                d.disable();
+                                jpa.save(DeviceTokenMapper.toEntity(d));
+                            }
+                        });
+    }
 }

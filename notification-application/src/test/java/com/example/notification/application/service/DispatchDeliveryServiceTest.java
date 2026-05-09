@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.notification.application.port.out.DeliveryAttemptRepository;
 import com.example.notification.application.port.out.DeliveryGateway;
+import com.example.notification.application.port.out.DeviceTokenRepository;
 import com.example.notification.domain.channel.Channel;
 import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.delivery.DeliveryAttempt;
@@ -26,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DispatchDeliveryServiceTest {
 
     @Mock DeliveryAttemptRepository repository;
+    @Mock DeviceTokenRepository deviceTokenRepository;
     @Mock DeliveryGateway pushGateway;
 
     DispatchDeliveryService service;
@@ -33,15 +35,68 @@ class DispatchDeliveryServiceTest {
     @BeforeEach
     void setUp() {
         when(pushGateway.channelType()).thenReturn(ChannelType.PUSH);
-        service = new DispatchDeliveryService(repository, List.of(pushGateway));
+        service =
+                new DispatchDeliveryService(
+                        repository, deviceTokenRepository, List.of(pushGateway));
     }
 
     @Test
     void duplicate_gateway_for_same_channel_rejected_at_construction() {
         DeliveryGateway p1 = mock(ChannelType.PUSH);
         DeliveryGateway p2 = mock(ChannelType.PUSH);
-        assertThatThrownBy(() -> new DispatchDeliveryService(repository, List.of(p1, p2)))
+        assertThatThrownBy(
+                        () ->
+                                new DispatchDeliveryService(
+                                        repository, deviceTokenRepository, List.of(p1, p2)))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void PUSH_영구_실패_시_device_token_비활성화() {
+        DeliveryAttempt a = newPushAttempt();
+        when(repository.findById(a.id())).thenReturn(Optional.of(a));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(pushGateway.dispatch(any()))
+                .thenThrow(
+                        new com.example.notification.adapter.out.vendor.VendorPermanentExceptionStub(
+                                "FCM NOT_REGISTERED"));
+
+        service.dispatch(a.id());
+
+        verify(deviceTokenRepository).deactivateByToken(a.channel().address());
+        assertThat(a.failureReason()).contains("permanent");
+    }
+
+    @Test
+    void EMAIL_영구_실패_시_device_token_비활성화_안_함() {
+        DeliveryGateway emailGateway =
+                new DeliveryGateway() {
+                    @Override
+                    public ChannelType channelType() {
+                        return ChannelType.EMAIL;
+                    }
+
+                    @Override
+                    public String dispatch(DeliveryAttempt attempt) {
+                        throw new com.example.notification.adapter.out.vendor.VendorPermanentExceptionStub(
+                                "SES MessageRejected");
+                    }
+                };
+        DispatchDeliveryService emailService =
+                new DispatchDeliveryService(
+                        repository, deviceTokenRepository, List.of(emailGateway));
+        DeliveryAttempt a =
+                DeliveryAttempt.create(
+                        UUID.randomUUID(),
+                        new Channel(ChannelType.EMAIL, "u@example.com"),
+                        "title",
+                        "body");
+        when(repository.findById(a.id())).thenReturn(Optional.of(a));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        emailService.dispatch(a.id());
+
+        verify(deviceTokenRepository, never()).deactivateByToken(any());
     }
 
     @Test
