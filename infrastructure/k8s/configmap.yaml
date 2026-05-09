@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-hub-config
+  namespace: notification
+data:
+  DB_HOST: postgres.notification.svc.cluster.local
+  DB_NAME: notification
+  REDIS_HOST: redis.notification.svc.cluster.local
+  KAFKA_BOOTSTRAP: kafka.notification.svc.cluster.local:9092
