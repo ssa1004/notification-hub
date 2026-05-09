@@ -16,6 +16,7 @@
 - [ADR-0009 K8s 3종 probe (startup/readiness/liveness)](0009-k8s-probes.md)
 - [ADR-0010 Graceful shutdown — Spring + K8s 연계](0010-graceful-shutdown.md)
 - [ADR-0011 Resilience4j retry — exp backoff + jitter, vendor 별 분리](0011-resilience4j-retry-tuning.md)
+- [ADR-0012 DLQ 운영 endpoint — list / replay / discard](0012-dlq-admin-endpoint.md)
 
 ## 작성 양식
 
