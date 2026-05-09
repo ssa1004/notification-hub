@@ -9,6 +9,7 @@ import com.example.notification.application.exception.TemplateNotFoundException;
 import com.example.notification.application.port.in.SendNotificationUseCase;
 import com.example.notification.application.port.out.AuditLogger;
 import com.example.notification.application.port.out.DeliveryAttemptRepository;
+import com.example.notification.application.port.out.DeviceTokenRepository;
 import com.example.notification.application.port.out.IdempotencyStore;
 import com.example.notification.application.port.out.NotificationRepository;
 import com.example.notification.application.port.out.OutboxPublisher;
@@ -19,6 +20,7 @@ import com.example.notification.application.port.out.TemplateRepository;
 import com.example.notification.application.port.out.UserPreferenceRepository;
 import com.example.notification.domain.channel.Channel;
 import com.example.notification.domain.channel.ChannelType;
+import com.example.notification.domain.device.DeviceToken;
 import com.example.notification.domain.delivery.DeliveryAttempt;
 import com.example.notification.domain.delivery.DeliveryRequested;
 import com.example.notification.domain.notification.Notification;
@@ -72,6 +74,7 @@ public class SendNotificationService implements SendNotificationUseCase {
     private final OutboxPublisher outboxPublisher;
     private final ChannelResolver channelResolver;
     private final AuditLogger auditLogger;
+    private final DeviceTokenRepository deviceTokenRepository;
 
     @Override
     @Transactional
@@ -100,7 +103,8 @@ public class SendNotificationService implements SendNotificationUseCase {
                 command.templateKey());
 
         Instant now = Instant.now();
-        List<Channel> channels = channelResolver.resolve(recipient, preference, command.kind(), now);
+        List<Channel> resolved = channelResolver.resolve(recipient, preference, command.kind(), now);
+        List<Channel> channels = expandPushFanOut(recipientId, resolved);
 
         if (channels.isEmpty()) {
             notification.markSuppressed();
@@ -151,6 +155,35 @@ public class SendNotificationService implements SendNotificationUseCase {
                 NotificationStatus.FANNED_OUT,
                 channels.stream().map(Channel::type).toList(),
                 null);
+    }
+
+    /**
+     * PUSH 채널을 사용자의 모든 active device token 으로 fan-out. ChannelResolver 가 반환한
+     * PUSH 가 1개 (recipient.channels 에 들어있는 placeholder) 인 경우, 실제 active device 가
+     * N개면 N개의 PUSH Channel 로 치환 — 각 device 가 별도 attempt 로 발송.
+     *
+     * <p>active device 가 0개면 PUSH 자체를 결과에서 제거 (사용자가 push 끄고 다른 채널만 받는
+     * 케이스). PUSH 가 아닌 다른 채널 (EMAIL/SMS/KAKAO) 은 그대로 통과.
+     */
+    private List<Channel> expandPushFanOut(RecipientId recipientId, List<Channel> resolved) {
+        boolean hasPush = resolved.stream().anyMatch(c -> c.type() == ChannelType.PUSH);
+        if (!hasPush) {
+            return resolved;
+        }
+        List<DeviceToken> activeDevices = deviceTokenRepository.findActiveByRecipientId(recipientId);
+        List<Channel> expanded = new ArrayList<>(resolved.size() + activeDevices.size());
+        for (Channel ch : resolved) {
+            if (ch.type() != ChannelType.PUSH) {
+                expanded.add(ch);
+                continue;
+            }
+            // recipient 의 PUSH placeholder 는 무시하고 active device token 으로 N개 치환.
+            // active 0 이면 push 발송 자체 안 함 (사용자가 device 등록 안 한 상태).
+            for (DeviceToken d : activeDevices) {
+                expanded.add(new Channel(ChannelType.PUSH, d.token()));
+            }
+        }
+        return expanded;
     }
 
     private List<DeliveryAttempt> createAttempts(

@@ -19,6 +19,7 @@ import com.example.notification.application.exception.RecipientNotFoundException
 import com.example.notification.application.exception.TemplateNotFoundException;
 import com.example.notification.application.port.out.AuditLogger;
 import com.example.notification.application.port.out.DeliveryAttemptRepository;
+import com.example.notification.application.port.out.DeviceTokenRepository;
 import com.example.notification.application.port.out.IdempotencyStore;
 import com.example.notification.application.port.out.NotificationRepository;
 import com.example.notification.application.port.out.OutboxPublisher;
@@ -30,6 +31,7 @@ import com.example.notification.application.port.out.UserPreferenceRepository;
 import com.example.notification.domain.channel.Channel;
 import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.delivery.DeliveryAttempt;
+import com.example.notification.domain.device.DeviceToken;
 import com.example.notification.domain.notification.Notification;
 import com.example.notification.domain.notification.NotificationKind;
 import com.example.notification.domain.notification.NotificationStatus;
@@ -65,6 +67,7 @@ class SendNotificationServiceTest {
     @Mock RateLimiter rateLimiter;
     @Mock OutboxPublisher outboxPublisher;
     @Mock AuditLogger auditLogger;
+    @Mock DeviceTokenRepository deviceTokenRepository;
 
     SendNotificationService service;
 
@@ -84,7 +87,8 @@ class SendNotificationServiceTest {
                 rateLimiter,
                 outboxPublisher,
                 new ChannelResolver(),
-                auditLogger);
+                auditLogger,
+                deviceTokenRepository);
     }
 
     @Test
@@ -147,6 +151,8 @@ class SendNotificationServiceTest {
         when(rateLimiter.tryConsume(eq(USER), any())).thenReturn(RateLimitDecision.allow(9));
         when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(deliveryAttemptRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(deviceTokenRepository.findActiveByRecipientId(USER))
+                .thenReturn(List.of(token("d".repeat(160))));
 
         SendNotificationResult result = service.send(rawCmdSecurity());
 
@@ -158,6 +164,60 @@ class SendNotificationServiceTest {
                 .publish(startsWith("notification.delivery."), any(), any());
         verify(auditLogger, times(1))
                 .log(eq(USER.value()), eq("NOTIFICATION_FANNED_OUT"), any());
+    }
+
+    @Test
+    void multi_device_PUSH_가_N개_attempt_생성() {
+        Recipient r = recipient();
+        when(idempotencyStore.tryAcquire(any(), any())).thenReturn(true);
+        when(recipientRepository.findById(USER)).thenReturn(Optional.of(r));
+        when(userPreferenceRepository.findByRecipientId(USER))
+                .thenReturn(Optional.of(UserPreference.defaults(USER)));
+        when(rateLimiter.tryConsume(eq(USER), any())).thenReturn(RateLimitDecision.allow(9));
+        when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(deliveryAttemptRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        // device 3개 등록 — push fan-out 3개로 늘어남
+        when(deviceTokenRepository.findActiveByRecipientId(USER))
+                .thenReturn(
+                        List.of(
+                                token("a".repeat(160)),
+                                token("b".repeat(160)),
+                                token("c".repeat(160))));
+
+        SendNotificationResult result = service.send(rawCmdSecurity());
+
+        assertThat(result.status()).isEqualTo(NotificationStatus.FANNED_OUT);
+        // dispatchedChannels 는 unique ChannelType 만 보지만, 실제 attempt 는 3+1+1=5 개
+        verify(outboxPublisher, times(5))
+                .publish(startsWith("notification.delivery."), any(), any());
+        // PUSH topic 으로만 3건 발행
+        verify(outboxPublisher, times(3))
+                .publish(eq("notification.delivery.push"), any(), any());
+    }
+
+    @Test
+    void active_device_가_0개면_PUSH_채널_제거() {
+        Recipient r = recipient();
+        when(idempotencyStore.tryAcquire(any(), any())).thenReturn(true);
+        when(recipientRepository.findById(USER)).thenReturn(Optional.of(r));
+        when(userPreferenceRepository.findByRecipientId(USER))
+                .thenReturn(Optional.of(UserPreference.defaults(USER)));
+        when(rateLimiter.tryConsume(eq(USER), any())).thenReturn(RateLimitDecision.allow(9));
+        when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(deliveryAttemptRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(deviceTokenRepository.findActiveByRecipientId(USER)).thenReturn(List.of());
+
+        SendNotificationResult result = service.send(rawCmdSecurity());
+
+        // PUSH 0 이면 EMAIL/SMS 만 — PUSH topic 발행 안 됨
+        assertThat(result.dispatchedChannels())
+                .containsExactly(ChannelType.EMAIL, ChannelType.SMS);
+        verify(outboxPublisher, never())
+                .publish(eq("notification.delivery.push"), any(), any());
+    }
+
+    private static DeviceToken token(String raw) {
+        return DeviceToken.register(USER, DeviceToken.Platform.ANDROID, raw);
     }
 
     @Test
