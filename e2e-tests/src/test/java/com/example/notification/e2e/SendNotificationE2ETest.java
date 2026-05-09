@@ -9,7 +9,9 @@ import com.example.notification.adapter.out.persistence.repository.OutboxEventJp
 import com.example.notification.application.dto.SendNotificationCommand;
 import com.example.notification.application.dto.SendNotificationResult;
 import com.example.notification.application.exception.DuplicateRequestException;
+import com.example.notification.application.port.in.RegisterDeviceTokenUseCase;
 import com.example.notification.application.port.in.SendNotificationUseCase;
+import com.example.notification.domain.device.DeviceToken.Platform;
 import com.example.notification.domain.channel.Channel;
 import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.delivery.DeliveryStatus;
@@ -30,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 class SendNotificationE2ETest extends AbstractE2ETest {
 
     @Autowired SendNotificationUseCase sendUseCase;
+    @Autowired RegisterDeviceTokenUseCase registerDeviceTokenUseCase;
     @Autowired JpaRecipientRepository recipientRepository;
     @Autowired DeliveryAttemptJpaRepository attemptJpa;
     @Autowired OutboxEventJpaRepository outboxJpa;
@@ -47,6 +50,11 @@ class SendNotificationE2ETest extends AbstractE2ETest {
                                 new Channel(ChannelType.SMS, "+821012345678")),
                         Locale.KO_KR,
                         ZoneId.of("Asia/Seoul")));
+        // multi-device fan-out 정책 — PUSH 는 active device token 이 있어야 발송 대상.
+        // 기기 등록 1개로 PUSH 1개 발송 보장.
+        registerDeviceTokenUseCase.register(
+                new RegisterDeviceTokenUseCase.RegisterCommand(
+                        USER.value(), Platform.IOS, "p".repeat(160)));
     }
 
     @Test
