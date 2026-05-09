@@ -15,14 +15,24 @@ import org.springframework.stereotype.Component;
 /**
  * FCM 호출의 Mock. 실제 SDK 의존성을 추가하지 않고 학습용으로 동작 시뮬레이션.
  *
- * <p>{@code vendor.fcm.failure-rate} (0.0~1.0) 비율로 무작위 실패. 실패 중 1/3 은 4xx
- * (NOT_REGISTERED 같은 영구 오류 — retry 무의미), 1/3 은 5xx (transient — Resilience4j retry
- * 대상), 1/3 은 IOException (network — Resilience4j retry 대상). Resilience4j retry 가 적용되어
- * 5xx/IO 는 자동 재호출.
+ * <p>응답 형식은 FCM HTTP v1 규격을 흉내내 {@code projects/{project}/messages/{id}} 형태로
+ * 반환 — 실제 SDK 로 교체 시 호출 측 (audit / 로깅 / 콜백 매칭) 코드가 그대로 동작하도록.
+ *
+ * <p>{@code vendor.fcm.failure-rate} (0.0~1.0) 비율로 무작위 실패. 실패는 4가지 케이스 중 하나:
+ *
+ * <ul>
+ *   <li>{@link VendorPermanentException} — NOT_REGISTERED (단말 토큰 만료/제거). retry 무의미.
+ *   <li>{@link VendorPermanentException} — INVALID_ARGUMENT (페이로드 형식 오류). retry 무의미.
+ *   <li>{@link VendorTransientException} — UNAVAILABLE (5xx). Resilience4j retry 대상.
+ *   <li>{@link UncheckedIOException} — connection reset. Resilience4j retry 대상.
+ * </ul>
  */
 @Slf4j
 @Component
 public class MockFcmClient implements DeliveryGateway {
+
+    /** FCM HTTP v1 의 message name 포맷. {@code projects/{project}/messages/{id}}. */
+    private static final String MSG_ID_FORMAT = "projects/notification-hub/messages/%s";
 
     @Value("${vendor.fcm.failure-rate:0.0}")
     private double failureRate;
@@ -36,16 +46,25 @@ public class MockFcmClient implements DeliveryGateway {
     @Retry(name = "fcm")
     public String dispatch(DeliveryAttempt attempt) {
         if (ThreadLocalRandom.current().nextDouble() < failureRate) {
-            int kind = ThreadLocalRandom.current().nextInt(3);
+            int kind = ThreadLocalRandom.current().nextInt(4);
             switch (kind) {
                 case 0 -> {
                     log.warn(
-                            "[MockFcmClient] 영구 오류 (NOT_REGISTERED) attemptId={}", attempt.id());
-                    throw new VendorPermanentException("FCM NOT_REGISTERED");
+                            "[MockFcmClient] 영구 오류 (NOT_REGISTERED) attemptId={}",
+                            attempt.id());
+                    throw new VendorPermanentException(
+                            "FCM messaging/registration-token-not-registered");
                 }
                 case 1 -> {
-                    log.warn("[MockFcmClient] 일시 오류 (5xx) attemptId={}", attempt.id());
-                    throw new VendorTransientException("FCM 5xx");
+                    log.warn(
+                            "[MockFcmClient] 영구 오류 (INVALID_ARGUMENT) attemptId={}",
+                            attempt.id());
+                    throw new VendorPermanentException(
+                            "FCM messaging/invalid-argument");
+                }
+                case 2 -> {
+                    log.warn("[MockFcmClient] 일시 오류 (UNAVAILABLE) attemptId={}", attempt.id());
+                    throw new VendorTransientException("FCM messaging/server-unavailable");
                 }
                 default -> {
                     log.warn("[MockFcmClient] 네트워크 오류 attemptId={}", attempt.id());
@@ -53,7 +72,7 @@ public class MockFcmClient implements DeliveryGateway {
                 }
             }
         }
-        String msgId = "fcm-" + UUID.randomUUID();
+        String msgId = String.format(MSG_ID_FORMAT, UUID.randomUUID());
         log.info(
                 "[MockFcmClient] dispatched attemptId={} address={} msgId={}",
                 attempt.id(),
