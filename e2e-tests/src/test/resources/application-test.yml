@@ -8,6 +8,14 @@ spring:
   kafka:
     listener:
       auto-startup: true
+  datasource:
+    hikari:
+      # 통합 테스트 — leak detection 끔 (test tear-down 이 close 보다 늦으면 false positive)
+      leak-detection-threshold: 0
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 5000
+      pool-name: notification-hub-pool-test
 outbox:
   relay:
     fixed-delay-ms: 200
