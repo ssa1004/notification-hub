@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.example.notification.application.port.out.DeliveryAttemptRepository;
 import com.example.notification.application.port.out.DeliveryGateway;
 import com.example.notification.application.port.out.DeviceTokenRepository;
+import com.example.notification.application.port.out.PermanentDeliveryFailure;
 import com.example.notification.domain.channel.Channel;
 import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.delivery.DeliveryAttempt;
@@ -57,9 +58,7 @@ class DispatchDeliveryServiceTest {
         when(repository.findById(a.id())).thenReturn(Optional.of(a));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(pushGateway.dispatch(any()))
-                .thenThrow(
-                        new com.example.notification.adapter.out.vendor.VendorPermanentExceptionStub(
-                                "FCM NOT_REGISTERED"));
+                .thenThrow(new TestPermanentFailure("FCM NOT_REGISTERED"));
 
         service.dispatch(a.id());
 
@@ -78,8 +77,7 @@ class DispatchDeliveryServiceTest {
 
                     @Override
                     public String dispatch(DeliveryAttempt attempt) {
-                        throw new com.example.notification.adapter.out.vendor.VendorPermanentExceptionStub(
-                                "SES MessageRejected");
+                        throw new TestPermanentFailure("SES MessageRejected");
                     }
                 };
         DispatchDeliveryService emailService =
@@ -180,5 +178,16 @@ class DispatchDeliveryServiceTest {
                 new Channel(ChannelType.PUSH, "p".repeat(160)),
                 "title",
                 "body");
+    }
+
+    /**
+     * 테스트 전용 — application 모듈은 adapter-out 의 구체 vendor 예외에 의존하지 않으므로
+     * {@link PermanentDeliveryFailure} 마커만 구현한 로컬 stub 으로 분기 행동을 검증.
+     */
+    static final class TestPermanentFailure extends RuntimeException
+            implements PermanentDeliveryFailure {
+        TestPermanentFailure(String message) {
+            super(message);
+        }
     }
 }

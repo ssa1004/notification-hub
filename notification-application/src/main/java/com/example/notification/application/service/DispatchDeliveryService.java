@@ -4,6 +4,7 @@ import com.example.notification.application.port.in.DispatchDeliveryUseCase;
 import com.example.notification.application.port.out.DeliveryAttemptRepository;
 import com.example.notification.application.port.out.DeliveryGateway;
 import com.example.notification.application.port.out.DeviceTokenRepository;
+import com.example.notification.application.port.out.PermanentDeliveryFailure;
 import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.delivery.DeliveryAttempt;
 import com.example.notification.domain.delivery.DeliveryStatus;
@@ -78,8 +79,10 @@ public class DispatchDeliveryService implements DispatchDeliveryUseCase {
             String vendorMessageId = gateway.dispatch(attempt);
             attempt.markSucceeded(vendorMessageId);
         } catch (RuntimeException ex) {
-            // 도메인이 retry/EXHAUSTED 자동 처리. transient/permanent 구분은 메시지 prefix 로만.
-            boolean permanent = ex.getClass().getSimpleName().contains("Permanent");
+            // 도메인이 retry/EXHAUSTED 자동 처리. transient/permanent 구분은 마커 인터페이스로.
+            // (이전엔 클래스 simple name 의 "Permanent" 문자열 매칭이었으나 rename 한 줄로
+            // 망가지고 IDE refactor 도 못 잡는 구조라 PermanentDeliveryFailure 마커로 교체.)
+            boolean permanent = ex instanceof PermanentDeliveryFailure;
             String prefix = permanent ? FAIL_PREFIX_PERMANENT : FAIL_PREFIX_TRANSIENT;
             log.warn("vendor failure id={} reason={}", attempt.id(), ex.getMessage());
             attempt.markFailed(prefix + ex.getMessage());
