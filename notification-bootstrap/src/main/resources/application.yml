@@ -1,0 +1,122 @@
+spring:
+  application:
+    name: notification-hub
+  threads:
+    virtual:
+      enabled: true   # Java 21 virtual threads — vendor 호출 다수 동시 처리에 적합
+  datasource:
+    url: jdbc:h2:mem:notification;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: notification-hub
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger
+
+# Outbox relay polling
+outbox:
+  relay:
+    fixed-delay-ms: 500
+    batch-size: 50
+    send-timeout-ms: 3000
+
+# 사용자 × channel 별 토큰 버킷 — vendor 비용 / 사용자 폭주 방지
+ratelimit:
+  window-ms: 60000
+  push-per-window: 30
+  email-per-window: 30
+  sms-per-window: 5
+  kakao-per-window: 5
+
+# vendor mock — failure-rate 0.0~1.0 사이 (테스트용 인위 실패 주입)
+vendor:
+  fcm:
+    failure-rate: 0.0
+  ses:
+    failure-rate: 0.0
+  twilio:
+    failure-rate: 0.0
+  kakao:
+    failure-rate: 0.0
+
+# Resilience4j retry config — vendor 호출 단계
+resilience4j:
+  retry:
+    instances:
+      vendorFcm:
+        max-attempts: 3
+        wait-duration: 200ms
+        retry-exceptions:
+          - com.example.notification.adapter.out.vendor.VendorTransientException
+      vendorSes:
+        max-attempts: 3
+        wait-duration: 200ms
+        retry-exceptions:
+          - com.example.notification.adapter.out.vendor.VendorTransientException
+      vendorTwilio:
+        max-attempts: 3
+        wait-duration: 200ms
+        retry-exceptions:
+          - com.example.notification.adapter.out.vendor.VendorTransientException
+      vendorKakao:
+        max-attempts: 3
+        wait-duration: 200ms
+        retry-exceptions:
+          - com.example.notification.adapter.out.vendor.VendorTransientException
+
+logging:
+  level:
+    com.example.notification: INFO
+    audit: INFO
+    org.hibernate.SQL: WARN
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:notification}
+    username: ${DB_USER:notification}
+    password: ${DB_PASSWORD:notification}
+    driver-class-name: org.postgresql.Driver
