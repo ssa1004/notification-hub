@@ -50,14 +50,14 @@ public class DeliveryAcknowledgeController {
             @Valid @RequestBody AcknowledgeDeliveryRequest request)
             throws IOException {
         // 가짜 콜백 차단 — vendor 식별 + secret 매핑 + HMAC 검증.
-        // *fail-closed* — vendor 등록 안 됨 / secret 미설정 / 서명 불일치 모두 거절.
+        // fail-closed — vendor 등록 안 됨 / secret 미설정 / 서명 불일치 모두 거절.
         String secret = webhookSecrets.secretFor(vendor);
         if (secret == null) {
             log.warn("webhook 거절: vendor 미등록 또는 secret 미설정 vendor={}", vendor);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "unknown vendor or secret");
         }
         // body 를 다시 직렬화해 HMAC 입력으로 사용. 운영에서는 ContentCachingRequestWrapper 로
-        // raw bytes 를 그대로 사용하는 편이 더 정확 — 본 ADR 의 단순화 (포폴 단계).
+        // raw bytes 를 그대로 사용하는 편이 더 정확 — 본 ADR 의 단순화.
         byte[] body = objectMapper.writeValueAsBytes(request);
         boolean ok = HmacSignatureVerifier.verify(
                 secret, signature, timestamp, body, clock.millis());

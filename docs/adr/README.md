@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
-설계 의사결정의 배경 + 결정 + 결과를 한 파일당 하나로 보관합니다. 5년차 개발자가 cold-read
-30초 안에 핵심을 잡을 수 있는 분량 (1~2페이지) 을 목표로 합니다.
+설계 의사결정의 배경 + 결정 + 결과를 한 파일당 하나로 보관합니다. 처음 보는 사람이 짧은
+시간 안에 핵심을 잡을 수 있는 분량 (1~2페이지) 을 목표로 합니다.
 
 ## 목록
 
@@ -18,6 +18,7 @@
 - [ADR-0011 Resilience4j retry — exp backoff + jitter, vendor 별 분리](0011-resilience4j-retry-tuning.md)
 - [ADR-0012 DLQ 운영 endpoint — list / replay / discard](0012-dlq-admin-endpoint.md)
 - [ADR-0013 Multi-device push fan-out + 영구 실패 자동 비활성화](0013-multi-device-push-fanout.md)
+- [ADR-0014 HMAC 기반 webhook 콜백 서명 검증](0014-hmac-webhook-callback-verification.md)
 
 ## 작성 양식
 
