@@ -4,6 +4,10 @@ spring:
   threads:
     virtual:
       enabled: true   # Java 21 virtual threads — vendor 호출 다수 동시 처리에 적합
+  lifecycle:
+    # graceful shutdown 의 phase 별 timeout. web container, scheduled task, kafka consumer 등이
+    # 이 시간 안에 정리 안 되면 강제 종료. 짧으면 in-flight 잘림, 길면 K8s 가 SIGKILL.
+    timeout-per-shutdown-phase: 25s
   datasource:
     url: jdbc:h2:mem:notification;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
     username: sa
@@ -53,6 +57,9 @@ spring:
 
 server:
   port: 8080
+  # SIGTERM 받으면 pending request 처리하고 종료. K8s preStop sleep 5s + grace 25s 와 합쳐
+  # 30s 안에 in-flight 요청 정리 + connection drain.
+  shutdown: graceful
 
 management:
   endpoints:
@@ -64,6 +71,22 @@ management:
       probes:
         enabled: true
       show-details: when-authorized
+      group:
+        # K8s 3종 probe 매핑 — readiness 는 외부 의존 (Kafka/Redis) 도 체크,
+        # liveness 는 process alive 만. ApplicationReadinessCoordinator 가 readinessState 를
+        # 직접 갱신하므로 별도 indicator 추가 안 함 (중복 fail 방지).
+        readiness:
+          include: readinessState
+        liveness:
+          include: livenessState
+  health:
+    kafka:
+      enabled: false   # 기본 KafkaHealthIndicator 끄고 ApplicationReadinessCoordinator 사용
+    redis:
+      enabled: false   # 위와 동일
+
+readiness:
+  probe-interval-ms: 5000
 
 springdoc:
   swagger-ui:

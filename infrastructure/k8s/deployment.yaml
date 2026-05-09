@@ -71,26 +71,42 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
-          # Spring Boot 가 시작 시 Flyway 마이그레이션 + JPA 초기화 → 시작 시간 여유
+          # 3종 probe 분리 (startup/readiness/liveness) — Spring Boot Actuator 의 health
+          # group 매핑은 application.yml 의 `management.endpoint.health.group` 참고.
+          # startupProbe 는 부팅 단계 (Flyway 마이그레이션 + JPA 초기화 + Kafka producer/Redis
+          # 첫 connection) 가 끝날 때까지 readiness/liveness 를 막고, 그 동안 K8s 가 죽이지 않게.
+          # 부팅 후엔 readiness/liveness 가 책임을 인계받음.
           startupProbe:
             httpGet: { path: /actuator/health/readiness, port: http }
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            failureThreshold: 30
+            initialDelaySeconds: 5
+            periodSeconds: 3
+            failureThreshold: 40   # 5s + 3s × 40 = 약 2분 — Flyway / 캐시 워밍업 충분
+          # readiness 는 외부 의존 (Kafka producer / Redis) 의 실시간 상태 — 의존 단절이면
+          # service endpoint 에서 빠짐. 5s 주기로 빠르게 반영.
           readinessProbe:
             httpGet: { path: /actuator/health/readiness, port: http }
             periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          # liveness 는 process alive 만. 외부 의존과 무관 — Kafka 일시 단절로 pod 재기동되면
+          # cascade 장애가 됨.
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: http }
             periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
           lifecycle:
             preStop:
+              # 5s sleep — service endpoint 에서 pod 가 빠지는 시간 확보 (kube-proxy
+              # iptables update + LB endpoint sync 가 SIGTERM 보다 늦게 도착하는 race 회피).
+              # 그 후 SIGTERM → Spring graceful shutdown (server.shutdown=graceful, 25s phase).
               exec:
-                command: ["sh", "-c", "sleep 15"]
+                command: ["sh", "-c", "sleep 5"]
       volumes:
         - name: tmp
           emptyDir: {}
-      terminationGracePeriodSeconds: 60
+      # terminationGrace = preStop 5s + Spring graceful 25s — 합 30s 안에 in-flight 정리.
+      terminationGracePeriodSeconds: 30
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
