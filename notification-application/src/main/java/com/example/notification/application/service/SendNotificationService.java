@@ -39,7 +39,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -230,10 +229,5 @@ public class SendNotificationService implements SendNotificationUseCase {
                     a.id().toString(),
                     DeliveryRequested.of(notification.id(), a.id(), type));
         }
-    }
-
-    /** 테스트/디버그용 — 일반 호출 X. */
-    public List<UUID> peekTopics() {
-        return List.of();
     }
 }
