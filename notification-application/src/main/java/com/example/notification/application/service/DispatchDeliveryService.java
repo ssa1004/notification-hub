@@ -3,6 +3,8 @@ package com.example.notification.application.service;
 import com.example.notification.application.port.in.DispatchDeliveryUseCase;
 import com.example.notification.application.port.out.DeliveryAttemptRepository;
 import com.example.notification.application.port.out.DeliveryGateway;
+import com.example.notification.application.port.out.DeviceTokenRepository;
+import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.delivery.DeliveryAttempt;
 import com.example.notification.domain.delivery.DeliveryStatus;
 import java.util.EnumMap;
@@ -27,12 +29,16 @@ public class DispatchDeliveryService implements DispatchDeliveryUseCase {
     static final String FAIL_PREFIX_TRANSIENT = "transient: ";
 
     private final DeliveryAttemptRepository repository;
+    private final DeviceTokenRepository deviceTokenRepository;
     private final Map<com.example.notification.domain.channel.ChannelType, DeliveryGateway>
             gatewaysByType = new EnumMap<>(com.example.notification.domain.channel.ChannelType.class);
 
     public DispatchDeliveryService(
-            DeliveryAttemptRepository repository, List<DeliveryGateway> gateways) {
+            DeliveryAttemptRepository repository,
+            DeviceTokenRepository deviceTokenRepository,
+            List<DeliveryGateway> gateways) {
         this.repository = repository;
+        this.deviceTokenRepository = deviceTokenRepository;
         for (DeliveryGateway g : gateways) {
             if (gatewaysByType.containsKey(g.channelType())) {
                 throw new IllegalStateException(
@@ -73,12 +79,25 @@ public class DispatchDeliveryService implements DispatchDeliveryUseCase {
             attempt.markSucceeded(vendorMessageId);
         } catch (RuntimeException ex) {
             // 도메인이 retry/EXHAUSTED 자동 처리. transient/permanent 구분은 메시지 prefix 로만.
-            String prefix =
-                    ex.getClass().getSimpleName().contains("Permanent")
-                            ? FAIL_PREFIX_PERMANENT
-                            : FAIL_PREFIX_TRANSIENT;
+            boolean permanent = ex.getClass().getSimpleName().contains("Permanent");
+            String prefix = permanent ? FAIL_PREFIX_PERMANENT : FAIL_PREFIX_TRANSIENT;
             log.warn("vendor failure id={} reason={}", attempt.id(), ex.getMessage());
             attempt.markFailed(prefix + ex.getMessage());
+
+            // PUSH 채널 + permanent (NOT_REGISTERED 등) → device token 비활성화. 이 user 의
+            // 다음 알림 fan-out 에서 이 token 으로 attempt 안 만듦.
+            if (permanent && attempt.channel().type() == ChannelType.PUSH) {
+                try {
+                    deviceTokenRepository.deactivateByToken(attempt.channel().address());
+                    log.info(
+                            "device token 비활성화 (vendor 영구 실패) attemptId={} reason={}",
+                            attempt.id(),
+                            ex.getMessage());
+                } catch (RuntimeException dx) {
+                    // 비활성화 실패는 dispatch 결과에 영향 안 줌 — 다음 호출에서 다시 시도.
+                    log.warn("device token 비활성화 실패: {}", dx.getMessage());
+                }
+            }
         }
         repository.save(attempt);
     }
