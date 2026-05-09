@@ -48,7 +48,7 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
 
 ## 핵심 설계 결정
 
-상세한 배경은 [docs/adr/](docs/adr/) 의 7건에 있습니다.
+상세한 배경은 [docs/adr/](docs/adr/) 의 14건에 있습니다.
 
 | ADR | 결정 |
 |---|---|
@@ -59,6 +59,13 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
 | [0005](docs/adr/0005-user-preference-priority.md) | 종류별 opt-out / DND / 채널 우선순위 |
 | [0006](docs/adr/0006-rate-limit-token-bucket.md) | 채널별 차등 한도 token bucket |
 | [0007](docs/adr/0007-vendor-adapter-port.md) | DeliveryGateway 공통 port 1개 + 채널별 adapter |
+| [0008](docs/adr/0008-hikaricp-tuning.md) | HikariCP 명시 튜닝 + leak detection |
+| [0009](docs/adr/0009-k8s-probes.md) | K8s 3종 probe (startup / readiness / liveness) 분리 |
+| [0010](docs/adr/0010-graceful-shutdown.md) | Graceful shutdown — Spring + K8s preStop 연계 |
+| [0011](docs/adr/0011-resilience4j-retry-tuning.md) | Resilience4j retry — exp backoff + jitter, vendor 별 분리 |
+| [0012](docs/adr/0012-dlq-admin-endpoint.md) | DLQ 운영 endpoint — list / replay / discard |
+| [0013](docs/adr/0013-multi-device-push-fanout.md) | Multi-device push fan-out + 영구 실패 자동 비활성화 |
+| [0014](docs/adr/0014-hmac-webhook-callback-verification.md) | HMAC-SHA256 webhook 콜백 서명 검증 |
 
 ## 발송 흐름
 
@@ -243,13 +250,11 @@ curl -s -X POST http://localhost:8080/api/v1/templates \
 ## 향후 개선 사항
 
 - vendor adapter 실 SDK 화 — 학습 단계의 Mock 4종을 실제 SDK 로 교체
-- DLQ 운영 endpoint — 운영자 UI 에서 EXHAUSTED attempt 를 조회 / 재발송 / 강제 종료
-- multi-device push — 한 사용자 여러 디바이스 모두 fan-out (현재 가장 최근 1개)
 - DND 정책 확장 — 평일/주말 분리, 휴일 캘린더 연동
 - A/B 테스트 — 같은 templateKey 의 여러 본문을 트래픽 분기로 발송 + 도착률 비교
 - vendor reputation 추적 — 채널 × vendor 조합별 도착률 / 실패율 metric → 자동 라우팅
   fallback (FCM 실패율 높으면 SMS 로)
-- 통합 vendor SDK 의존 격리를 위한 별도 `notification-adapter-out-vendor` 모듈 분리
+- vendor SDK 의존 격리를 위한 별도 `notification-adapter-out-vendor` 모듈 분리
 
 ---
 
