@@ -1,6 +1,7 @@
-package com.example.notification.adapter.out.vendor;
+package com.example.notification.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -22,17 +23,25 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class DeliveryDispatcherTest {
+class DispatchDeliveryServiceTest {
 
     @Mock DeliveryAttemptRepository repository;
     @Mock DeliveryGateway pushGateway;
 
-    DeliveryDispatcher dispatcher;
+    DispatchDeliveryService service;
 
     @BeforeEach
     void setUp() {
         when(pushGateway.channelType()).thenReturn(ChannelType.PUSH);
-        dispatcher = new DeliveryDispatcher(repository, new DeliveryGatewayRouter(List.of(pushGateway)));
+        service = new DispatchDeliveryService(repository, List.of(pushGateway));
+    }
+
+    @Test
+    void duplicate_gateway_for_same_channel_rejected_at_construction() {
+        DeliveryGateway p1 = mock(ChannelType.PUSH);
+        DeliveryGateway p2 = mock(ChannelType.PUSH);
+        assertThatThrownBy(() -> new DispatchDeliveryService(repository, List.of(p1, p2)))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -42,8 +51,9 @@ class DeliveryDispatcherTest {
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(pushGateway.dispatch(any())).thenReturn("vendor-1");
 
-        dispatcher.dispatch(a.id());
+        service.dispatch(a.id());
         assertThat(a.status()).isEqualTo(DeliveryStatus.SUCCEEDED);
+        assertThat(a.vendorMessageId()).isEqualTo("vendor-1");
     }
 
     @Test
@@ -51,12 +61,12 @@ class DeliveryDispatcherTest {
         DeliveryAttempt a = newPushAttempt();
         when(repository.findById(a.id())).thenReturn(Optional.of(a));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(pushGateway.dispatch(any())).thenThrow(new VendorTransientException("5xx"));
+        when(pushGateway.dispatch(any())).thenThrow(new RuntimeException("5xx transient"));
 
-        dispatcher.dispatch(a.id());
+        service.dispatch(a.id());
         assertThat(a.status()).isEqualTo(DeliveryStatus.PENDING);
-        assertThat(a.retryCount()).isEqualTo(1);
         assertThat(a.failureReason()).contains("transient");
+        assertThat(a.retryCount()).isEqualTo(1);
     }
 
     @Test
@@ -66,7 +76,7 @@ class DeliveryDispatcherTest {
         a.markSucceeded("vendor-x");
         when(repository.findById(a.id())).thenReturn(Optional.of(a));
 
-        dispatcher.dispatch(a.id());
+        service.dispatch(a.id());
         verify(pushGateway, never()).dispatch(any());
         verify(repository, never()).save(any());
     }
@@ -75,8 +85,38 @@ class DeliveryDispatcherTest {
     void unknown_attempt_throws() {
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.empty());
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dispatcher.dispatch(id))
+        assertThatThrownBy(() -> service.dispatch(id))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void no_gateway_marks_failed() {
+        // SMS gateway 없는 상태에서 SMS attempt 들어오면
+        DeliveryAttempt a = DeliveryAttempt.create(
+                UUID.randomUUID(),
+                new Channel(ChannelType.SMS, "+821012345678"),
+                "title",
+                "body");
+        when(repository.findById(a.id())).thenReturn(Optional.of(a));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.dispatch(a.id());
+        assertThat(a.status()).isEqualTo(DeliveryStatus.PENDING); // first failure → pending
+        assertThat(a.failureReason()).contains("no gateway");
+    }
+
+    private static DeliveryGateway mock(ChannelType type) {
+        return new DeliveryGateway() {
+            @Override
+            public ChannelType channelType() {
+                return type;
+            }
+
+            @Override
+            public String dispatch(DeliveryAttempt attempt) {
+                return "x";
+            }
+        };
     }
 
     private static DeliveryAttempt newPushAttempt() {
