@@ -20,6 +20,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("io.micrometer:micrometer-registry-prometheus")
 
+    // K8s readiness 신호 — Redis ping / Kafka cluster id 호출용. adapter-out 가 이미 transitively
+    // 가져오나 헥사고날 의존 방향상 bootstrap 이 직접 의존을 명시.
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("org.springframework.kafka:spring-kafka")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
