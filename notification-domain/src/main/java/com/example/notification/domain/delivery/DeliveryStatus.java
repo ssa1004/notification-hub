@@ -11,6 +11,9 @@ package com.example.notification.domain.delivery;
  *                  ├──▶ FAILED ──(retry < max)──▶ PENDING
  *                  │
  *                  └──▶ FAILED ──(retry == max)──▶ EXHAUSTED  (DLQ)
+ *
+ *   EXHAUSTED ──(operator replay)──▶ PENDING (retry=0)
+ *   EXHAUSTED ──(operator discard)──▶ PERMANENTLY_FAILED
  * </pre>
  */
 public enum DeliveryStatus {
@@ -23,5 +26,7 @@ public enum DeliveryStatus {
     /** vendor 호출 실패 (재시도 가능 단계). */
     FAILED,
     /** 재시도 횟수 초과 → DLQ 로 이동. 운영자가 수동으로만 재처리. */
-    EXHAUSTED
+    EXHAUSTED,
+    /** 운영자가 EXHAUSTED 를 영구 종료한 상태 — replay 불가. audit trail 만 유지. */
+    PERMANENTLY_FAILED
 }

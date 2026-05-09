@@ -61,6 +61,48 @@ class DeliveryAttemptTest {
     }
 
     @Test
+    void EXHAUSTED_replay_then_PENDING_with_retry_zero() {
+        DeliveryAttempt a = exhausted();
+        a.replayFromExhausted();
+        assertThat(a.status()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(a.retryCount()).isZero();
+        assertThat(a.completedAt()).isNull();
+        assertThat(a.nextAttemptAt()).isNotNull();
+    }
+
+    @Test
+    void replay_only_allowed_from_EXHAUSTED() {
+        DeliveryAttempt a = sample();
+        assertThatThrownBy(a::replayFromExhausted)
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void EXHAUSTED_discard_moves_to_PERMANENTLY_FAILED() {
+        DeliveryAttempt a = exhausted();
+        a.discardFromExhausted("운영자 판단: 알림 무의미");
+        assertThat(a.status()).isEqualTo(DeliveryStatus.PERMANENTLY_FAILED);
+        assertThat(a.isFinal()).isTrue();
+        assertThat(a.failureReason()).contains("discarded");
+    }
+
+    @Test
+    void discard_only_allowed_from_EXHAUSTED() {
+        DeliveryAttempt a = sample();
+        assertThatThrownBy(() -> a.discardFromExhausted("x"))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    private DeliveryAttempt exhausted() {
+        DeliveryAttempt a = sample();
+        for (int i = 0; i < DeliveryAttempt.MAX_RETRY; i++) {
+            a.markDispatching();
+            a.markFailed("vendor down");
+        }
+        return a;
+    }
+
+    @Test
     void backoff_grows_exponentially_and_is_capped() {
         assertThat(DeliveryAttempt.backoffFor(1).toMillis()).isEqualTo(1_000);
         assertThat(DeliveryAttempt.backoffFor(2).toMillis()).isEqualTo(2_000);

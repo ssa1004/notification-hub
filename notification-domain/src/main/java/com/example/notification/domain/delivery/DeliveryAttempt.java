@@ -135,7 +135,39 @@ public final class DeliveryAttempt {
 
     public boolean isFinal() {
         return status == DeliveryStatus.SUCCEEDED
-                || status == DeliveryStatus.EXHAUSTED;
+                || status == DeliveryStatus.EXHAUSTED
+                || status == DeliveryStatus.PERMANENTLY_FAILED;
+    }
+
+    /**
+     * 운영자가 EXHAUSTED 항목을 다시 발송 큐로 환원. retryCount 0 으로 초기화 → 새 attempt
+     * 처럼 MAX_RETRY 만큼 다시 시도 가능. completedAt / vendorMessageId / failureReason 은
+     * 다음 호출이 갱신.
+     */
+    public void replayFromExhausted() {
+        if (status != DeliveryStatus.EXHAUSTED) {
+            throw new IllegalStateException(
+                    "replay only allowed from EXHAUSTED, was " + status);
+        }
+        this.status = DeliveryStatus.PENDING;
+        this.retryCount = 0;
+        this.nextAttemptAt = Instant.now();
+        this.completedAt = null;
+    }
+
+    /**
+     * 운영자가 EXHAUSTED 항목을 영구 종료. audit trail 만 남기고 재발송 불가능. dispatch
+     * worker 가 상태 체크 후 무시.
+     */
+    public void discardFromExhausted(String reason) {
+        if (status != DeliveryStatus.EXHAUSTED) {
+            throw new IllegalStateException(
+                    "discard only allowed from EXHAUSTED, was " + status);
+        }
+        this.status = DeliveryStatus.PERMANENTLY_FAILED;
+        this.completedAt = Instant.now();
+        this.failureReason =
+                (failureReason == null ? "" : failureReason + " | ") + "discarded: " + reason;
     }
 
     public UUID id() {

@@ -1,9 +1,12 @@
 package com.example.notification.adapter.in.exception;
 
+import com.example.notification.application.exception.AttemptNotFoundException;
 import com.example.notification.application.exception.DuplicateRequestException;
+import com.example.notification.application.exception.IllegalDlqOperationException;
 import com.example.notification.application.exception.RateLimitExceededException;
 import com.example.notification.application.exception.RecipientNotFoundException;
 import com.example.notification.application.exception.TemplateNotFoundException;
+import com.example.notification.application.exception.UnauthorizedAdminException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.Map;
@@ -56,6 +59,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleBadRequest(
             Exception ex, HttpServletRequest req) {
         return error(HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(UnauthorizedAdminException.class)
+    public ResponseEntity<Map<String, Object>> handleUnauthorizedAdmin(
+            UnauthorizedAdminException ex, HttpServletRequest req) {
+        return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED_ADMIN", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(AttemptNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleAttemptNotFound(
+            AttemptNotFoundException ex, HttpServletRequest req) {
+        return error(HttpStatus.NOT_FOUND, "ATTEMPT_NOT_FOUND", ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(IllegalDlqOperationException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalDlqOperation(
+            IllegalDlqOperationException ex, HttpServletRequest req) {
+        return error(HttpStatus.CONFLICT, "ILLEGAL_DLQ_OPERATION", ex.getMessage(), req);
     }
 
     @ExceptionHandler(Exception.class)
