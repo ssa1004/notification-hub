@@ -1,0 +1,20 @@
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+**/build/
+**/.gradle/
+# IDE 빌드 산출물 (top-level out/) — 단, hexagonal package 의 adapter/out/ 은 코드이므로 negate
+/out/
+*/out/
+!**/src/**/out/
+*.log
+.env
+.env.local
+.claude/
+.kotlin/
+PLAN.md
+TODO.md
+notes.md
