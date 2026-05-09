@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-hub
+  namespace: notification
+  labels:
+    app.kubernetes.io/name: notification-hub
+    app.kubernetes.io/version: "0.1.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0   # PDB 와 함께 zero-downtime
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-hub
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-hub
+        app.kubernetes.io/version: "0.1.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: notification-hub
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: notification-hub
+          image: ghcr.io/your-org/notification-hub:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: DB_HOST
+              valueFrom: { configMapKeyRef: { name: notification-hub-config, key: DB_HOST } }
+            - name: DB_NAME
+              valueFrom: { configMapKeyRef: { name: notification-hub-config, key: DB_NAME } }
+            - name: REDIS_HOST
+              valueFrom: { configMapKeyRef: { name: notification-hub-config, key: REDIS_HOST } }
+            - name: KAFKA_BOOTSTRAP
+              valueFrom: { configMapKeyRef: { name: notification-hub-config, key: KAFKA_BOOTSTRAP } }
+            - name: DB_USER
+              valueFrom: { secretKeyRef: { name: notification-hub-secret, key: db.user } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: notification-hub-secret, key: db.password } }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "768Mi"
+            limits:
+              cpu: "2"
+              memory: "1.5Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          # Spring Boot 가 시작 시 Flyway 마이그레이션 + JPA 초기화 → 시작 시간 여유
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 15"]
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      terminationGracePeriodSeconds: 60
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notification-hub
+  namespace: notification
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-hub
