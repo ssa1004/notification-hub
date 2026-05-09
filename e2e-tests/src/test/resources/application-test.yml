@@ -1,0 +1,33 @@
+# e2e Testcontainers profile — datasource / kafka / redis 는 @DynamicPropertySource 로 주입.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  kafka:
+    listener:
+      auto-startup: true
+outbox:
+  relay:
+    fixed-delay-ms: 200
+    batch-size: 100
+ratelimit:
+  push-per-window: 1000
+  email-per-window: 1000
+  sms-per-window: 1000
+  kakao-per-window: 1000
+vendor:
+  fcm:
+    failure-rate: 0.0
+  ses:
+    failure-rate: 0.0
+  twilio:
+    failure-rate: 0.0
+  kakao:
+    failure-rate: 0.0
+logging:
+  level:
+    com.example.notification: INFO
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN
