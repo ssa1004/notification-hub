@@ -173,7 +173,7 @@ SPRING_PROFILES_ACTIVE=prod ./gradlew :notification-bootstrap:bootRun
 
 ```bash
 # 1. recipient seed (실제론 외부 user/auth service 가 master)
-# (포폴용으로는 통합 테스트의 seed 코드 참조)
+# (본 저장소에서는 통합 테스트의 seed 코드 참조)
 
 # 2. 알림 발송 — Idempotency-Key 필수
 curl -s -X POST http://localhost:8080/api/v1/notifications \
