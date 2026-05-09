@@ -6,16 +6,38 @@ import com.example.notification.domain.delivery.DeliveryAttempt;
 import io.github.resilience4j.retry.annotation.Retry;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Twilio SMS Mock. SMS body 90B 초과 시 vendor 가 분할 청구 — 여기선 길이만 로그로 안내. */
+/**
+ * Twilio SMS Mock.
+ *
+ * <p>응답 형식은 Twilio Message SID — {@code SM} prefix + 32자 hex (총 34자). 실제 SDK 로
+ * 교체 시 audit / 콜백 매칭 코드 호환.
+ *
+ * <p>SMS body 가 GSM-7 기준 160자 (UTF-8 90B 정도) 초과 시 vendor 가 segment 단위로 청구 —
+ * segment 추정치를 로그에 남겨 비용 가시성 제공.
+ *
+ * <p>실패 케이스:
+ *
+ * <ul>
+ *   <li>{@link VendorPermanentException} — Invalid 'To' Number (잘못된 형식). retry 무의미.
+ *   <li>{@link VendorTransientException} — 5xx (vendor 측 일시 오류). retry 대상.
+ *   <li>{@link UncheckedIOException} — connection reset. retry 대상.
+ * </ul>
+ */
 @Slf4j
 @Component
 public class MockTwilioClient implements DeliveryGateway {
+
+    /** Twilio Message SID prefix. */
+    private static final String SID_PREFIX = "SM";
+    /** UTF-8 기준 segment 추정 임계 (한글 본문 90B 이상이면 LMS / multi-segment 청구). */
+    private static final int SEGMENT_BYTE_LIMIT = 90;
 
     @Value("${vendor.twilio.failure-rate:0.0}")
     private double failureRate;
@@ -35,11 +57,12 @@ public class MockTwilioClient implements DeliveryGateway {
                     log.warn(
                             "[MockTwilioClient] 영구 오류 (Invalid 'To' Number) attemptId={}",
                             attempt.id());
-                    throw new VendorPermanentException("Twilio Invalid To Number");
+                    throw new VendorPermanentException(
+                            "Twilio 21211: Invalid 'To' phone number");
                 }
                 case 1 -> {
                     log.warn("[MockTwilioClient] 일시 오류 (5xx) attemptId={}", attempt.id());
-                    throw new VendorTransientException("Twilio 5xx");
+                    throw new VendorTransientException("Twilio 503: Service Unavailable");
                 }
                 default -> {
                     log.warn("[MockTwilioClient] 네트워크 오류 attemptId={}", attempt.id());
@@ -47,12 +70,17 @@ public class MockTwilioClient implements DeliveryGateway {
                 }
             }
         }
-        if (attempt.renderedBody().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 90) {
+        int bodyBytes =
+                attempt.renderedBody().getBytes(StandardCharsets.UTF_8).length;
+        if (bodyBytes > SEGMENT_BYTE_LIMIT) {
+            int segments = (bodyBytes + SEGMENT_BYTE_LIMIT - 1) / SEGMENT_BYTE_LIMIT;
             log.info(
-                    "[MockTwilioClient] LMS billing applied (body > 90B) attemptId={}",
-                    attempt.id());
+                    "[MockTwilioClient] LMS billing applied attemptId={} bytes={} segments={}",
+                    attempt.id(),
+                    bodyBytes,
+                    segments);
         }
-        String msgId = "twilio-" + UUID.randomUUID();
+        String msgId = SID_PREFIX + UUID.randomUUID().toString().replace("-", "");
         log.info("[MockTwilioClient] dispatched attemptId={} msgId={}", attempt.id(), msgId);
         return msgId;
     }

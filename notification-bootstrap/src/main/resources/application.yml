@@ -114,6 +114,9 @@ ratelimit:
   kakao-per-window: 5
 
 # vendor mock — failure-rate 0.0~1.0 사이 (테스트용 인위 실패 주입)
+# kakao.enforce-night-block — KST 21:00~08:00 시 vendor 측에서 영구 실패 반환할지 (실서비스
+# 카카오 알림톡 정책 반영). ChannelResolver 단에서도 1차 차단되지만, 우회 발송 / 운영자 강제
+# replay 시 vendor 단 final 거절 시뮬레이션.
 vendor:
   fcm:
     failure-rate: 0.0
@@ -123,6 +126,7 @@ vendor:
     failure-rate: 0.0
   kakao:
     failure-rate: 0.0
+    enforce-night-block: false
 
 # Resilience4j retry config — vendor 호출 단계.
 # *경계*: 여기 retry 는 한 vendor 호출 *내부* 의 단발성 5xx/IO 흡수만 책임 (max 3회 = 3 * 200~600ms).
