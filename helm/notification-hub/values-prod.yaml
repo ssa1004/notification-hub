@@ -1,0 +1,76 @@
+# prod override — values.yaml 을 base 로 삼고 운영 환경 차이만 명시.
+# helm install/upgrade 시 -f values.yaml -f values-prod.yaml 둘 다 지정.
+
+replicaCount: 3
+
+# image.tag 는 CD 파이프라인이 --set 으로 주입 (commit sha 등). 기본은 chart appVersion.
+
+# ---------------------------------------------------------------------------
+# 외부 의존 — prod 클러스터 내 cluster.local. 실 호스트는 환경별 override.
+# ---------------------------------------------------------------------------
+postgres:
+  poolMax: 30
+  poolMinIdle: 10
+
+# ---------------------------------------------------------------------------
+# Secret — prod 는 KMS / Vault / ExternalSecrets operator 가 만든 Secret 을 그대로 참조.
+# 차트가 평문 Secret 을 만들지 않음.
+# ---------------------------------------------------------------------------
+secrets:
+  mode: external
+  existingSecretName: notification-hub-secret
+
+# ---------------------------------------------------------------------------
+# Vendor — 실 SDK 모드.
+# ---------------------------------------------------------------------------
+vendor:
+  mode: real
+
+springProfile: prod
+
+# ---------------------------------------------------------------------------
+# HPA — 운영 트래픽 패턴 기반. 평시 2 ~ 폭주 10.
+# CPU 70% 가 vendor 호출 latency burst 시 가장 먼저 튐 (virtual thread context switch + JSON 직렬화).
+# Memory 는 보조 — 갑작스런 leak 안전망.
+# ---------------------------------------------------------------------------
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# ---------------------------------------------------------------------------
+# Ingress — TLS 필수. cert-manager + Let's Encrypt 가정.
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    # webhook callback 은 vendor 측 IP 로부터 들어옴 — 별도 whitelist 는 ingress controller
+    # 측 annotation 으로. (vendor 별 IP 범위는 환경 override)
+  hosts:
+    - host: notification.example.com
+      paths:
+        - path: /api/v1/notifications
+          pathType: Prefix
+        - path: /api/v1/admin
+          pathType: Prefix
+        - path: /webhooks
+          pathType: Prefix
+  tls:
+    - secretName: notification-hub-tls
+      hosts:
+        - notification.example.com
+
+# ---------------------------------------------------------------------------
+# NetworkPolicy — prod 활성. ingress / monitoring / vendor egress 명시.
+# ---------------------------------------------------------------------------
+networkPolicy:
+  enabled: true
+  egress:
+    # real vendor 모드 — 443 outbound 허용 (FCM / SES / Twilio / Kakao API).
+    # 가능하면 vendor IP CIDR 화이트리스트로 좁히는 게 운영 권장. 현재는 0.0.0.0/0:443 허용.
+    allowVendorEgress: true

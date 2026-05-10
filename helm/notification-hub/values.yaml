@@ -1,0 +1,293 @@
+# notification-hub 기본 values — dev / 로컬 검증 기준.
+# values-prod.yaml 로 prod override (replicas, HPA, ingress TLS, NetworkPolicy 등).
+
+# ---------------------------------------------------------------------------
+# 메타
+# ---------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
+
+# 운영 namespace 는 helm install -n 로 지정 (chart 내부 hardcode X).
+# 기존 infrastructure/k8s/namespace.yaml 의 "notification" 와 동일하게 쓰는 것 권장.
+
+# ---------------------------------------------------------------------------
+# Image
+# ---------------------------------------------------------------------------
+image:
+  repository: ghcr.io/ssa1004/notification-hub
+  # appVersion 과 동기화. helm install --set image.tag=... 로 override.
+  tag: ""   # 비우면 .Chart.AppVersion 사용
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# ---------------------------------------------------------------------------
+# Replica / 배포 전략
+# ---------------------------------------------------------------------------
+replicaCount: 2
+
+# rolling update — PDB minAvailable=1 와 같이 zero-downtime
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# ---------------------------------------------------------------------------
+# Pod-level
+# ---------------------------------------------------------------------------
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: /actuator/prometheus
+  prometheus.io/port: "8080"
+
+podLabels: {}
+
+# 컨테이너 이미지가 distroless / non-root 가정. /tmp 만 emptyDir mount.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# preStop sleep + Spring graceful 25s 합산. application.yml
+# spring.lifecycle.timeout-per-shutdown-phase 와 일치시켜야 함.
+terminationGracePeriodSeconds: 30
+
+# ---------------------------------------------------------------------------
+# Resources — virtual threads + HikariCP 20 풀 가정. JVM heap 1g 로 설정 시 limit 1.5Gi 여유.
+# ---------------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 300m
+    memory: 768Mi
+  limits:
+    cpu: "2"
+    memory: 1.5Gi
+
+# ---------------------------------------------------------------------------
+# ServiceAccount
+# ---------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  name: ""   # 비우면 fullname 사용
+  annotations: {}
+  # IRSA / Workload Identity 가 아닌 일반 cluster — 기본 비활성
+  automountServiceAccountToken: false
+
+# ---------------------------------------------------------------------------
+# Service
+# ---------------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations: {}
+
+# ---------------------------------------------------------------------------
+# Probes 3종
+#   startup    — Flyway 마이그레이션 + Spring context + Kafka producer 첫 connect 까지 대기
+#                (5s + 3s × 40 ≈ 2분). 이 동안 readiness/liveness 는 K8s 가 무시.
+#   readiness  — 외부 의존 (Kafka/Redis) readiness 까지 포함. 의존 단절이면 Service endpoint 빠짐.
+#   liveness   — process alive 만. 외부 의존 단절로 pod 죽이면 cascade 장애.
+# ---------------------------------------------------------------------------
+probes:
+  startup:
+    enabled: true
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 3
+    failureThreshold: 40
+  readiness:
+    enabled: true
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 3
+  liveness:
+    enabled: true
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 5
+
+# ---------------------------------------------------------------------------
+# Graceful shutdown
+#   preStop sleep 5s — Service endpoint 에서 pod 제거 + kube-proxy iptables sync 가
+#   SIGTERM 보다 늦게 도착하는 race 회피용. terminationGracePeriodSeconds 와 함께 운용.
+# ---------------------------------------------------------------------------
+gracefulShutdown:
+  preStopSleepSeconds: 5
+
+# ---------------------------------------------------------------------------
+# Spring profile / 환경 변수
+# ---------------------------------------------------------------------------
+springProfile: dev
+# extraEnv — vendor secret 외 추가 ENV 가 필요할 때 자유 주입. 평문 ENV 는 가급적 ConfigMap.
+extraEnv: []
+# 예) - name: JAVA_TOOL_OPTIONS
+#       value: "-XX:+UseZGC -Xmx1g"
+
+# ---------------------------------------------------------------------------
+# 외부 의존 — host / 접속 정보. 클러스터 내 서비스 가정.
+# ---------------------------------------------------------------------------
+postgres:
+  host: postgres.notification.svc.cluster.local
+  port: 5432
+  database: notification
+  # credentials 는 secret 으로 관리 (아래 secrets.* 참고).
+  poolMax: 20
+  poolMinIdle: 5
+
+redis:
+  host: redis.notification.svc.cluster.local
+  port: 6379
+
+kafka:
+  bootstrap: kafka.notification.svc.cluster.local:9092
+
+# ---------------------------------------------------------------------------
+# Secret 관리 모드
+#   create   — 차트가 직접 Secret 을 만든다 (dev 평문). prod 에서는 권장 X.
+#   external — 외부에서 만든 Secret 을 참조 (existingSecretName 만 지정).
+# ---------------------------------------------------------------------------
+secrets:
+  mode: create
+
+  # mode=create 일 때 사용할 평문값 (base64 인코딩은 helm 이 처리).
+  # 절대 git 에 실값 commit 하지 말 것 — 차트는 placeholder 만, 실값은 --set 또는
+  # 별도 values 파일 (gitignored) 로 주입.
+  db:
+    user: notification
+    password: changeme
+  admin:
+    # 관리자 endpoint (/api/v1/admin/**) 보호 토큰. 미지정시 차트가 default-deny 동작 유도.
+    authToken: ""
+  webhook:
+    # vendor 별 HMAC-SHA256 콜백 서명 키. rotation 시 grace window 운용 (도메인 측 책임).
+    fcm: ""
+    ses: ""
+    twilio: ""
+    kakao: ""
+  vendor:
+    # 실 vendor 모드 (vendor.mode=real) 일 때만 실제로 사용. mock 모드는 무시.
+    fcmServiceAccountJson: ""
+    sesAccessKeyId: ""
+    sesSecretAccessKey: ""
+    twilioAccountSid: ""
+    twilioAuthToken: ""
+    kakaoApiKey: ""
+
+  # mode=external 일 때 — 차트가 만들지 않고 이 이름의 기존 Secret 을 envFrom / valueFrom 으로 참조.
+  # KMS / Vault / ExternalSecrets operator 가 미리 동기화한 Secret 의 이름.
+  existingSecretName: ""
+
+# ---------------------------------------------------------------------------
+# Vendor mode — mock vs real.
+#   mock — 빌트인 mock adapter 4종 사용 (dev / 통합 테스트). secrets.vendor.* 무시.
+#   real — 실 vendor SDK / HTTP. secrets.vendor.* 가 envFrom 으로 주입되어야 함.
+# ---------------------------------------------------------------------------
+vendor:
+  mode: mock
+  # mock 모드 인위 실패율 (테스트용). 0.0 ~ 1.0
+  mock:
+    fcmFailureRate: 0.0
+    sesFailureRate: 0.0
+    twilioFailureRate: 0.0
+    kakaoFailureRate: 0.0
+    # KST 21:00~08:00 카카오 알림톡 강제 차단 (실 정책 모사)
+    kakaoEnforceNightBlock: false
+
+# ---------------------------------------------------------------------------
+# Ingress
+#   path 3종 분리:
+#     /api/v1/notifications/*  — 발송 / 조회 (호출 서비스)
+#     /api/v1/admin/*          — 운영 (DLQ replay, template CRUD 등) — 토큰 보호
+#     /webhooks/*              — vendor 콜백 (HMAC 서명 검증)
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  # 운영자 / vendor 콜백은 도메인 분리 가능 — host 1개로 묶고 path 로 라우팅하는 게 기본.
+  hosts:
+    - host: notification.example.com
+      paths:
+        - path: /api/v1/notifications
+          pathType: Prefix
+        - path: /api/v1/admin
+          pathType: Prefix
+        - path: /webhooks
+          pathType: Prefix
+  tls: []
+  # 예) tls:
+  #       - secretName: notification-tls
+  #         hosts: [notification.example.com]
+
+# ---------------------------------------------------------------------------
+# HPA — dev 는 끔. prod values 에서 활성.
+# ---------------------------------------------------------------------------
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Percent
+          value: 20
+          periodSeconds: 60
+
+# ---------------------------------------------------------------------------
+# PodDisruptionBudget — replica >= 2 일 때만 의미 있음
+# ---------------------------------------------------------------------------
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# ---------------------------------------------------------------------------
+# NetworkPolicy
+#   ingress allow:
+#     - 같은 namespace + ingress controller (HTTP)
+#     - prometheus scrape
+#   egress allow:
+#     - DNS (53)
+#     - postgres / redis / kafka
+#     - vendor (real 모드: 443 outbound) — prod 에서 cidr 제한 검토
+# ---------------------------------------------------------------------------
+networkPolicy:
+  enabled: false
+  ingress:
+    # ingress controller pod selector (가정 — nginx-ingress namespace label)
+    fromIngressNamespace: ingress-nginx
+    fromMonitoringNamespace: monitoring
+  egress:
+    # 외부 vendor 호출 허용 여부 (real 모드 시 true). dev mock 모드는 false.
+    allowVendorEgress: false
