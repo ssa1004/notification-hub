@@ -1,0 +1,87 @@
+{{- if .Values.networkPolicy.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "notification-hub.fullname" . }}
+  labels:
+    {{- include "notification-hub.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "notification-hub.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 같은 namespace 내부 호출 (e.g. 도메인 service 가 직접 cluster-internal 로 호출하는 경우)
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+    # ingress controller — public 트래픽 (REST + webhook callback) 진입
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingress.fromIngressNamespace | quote }}
+      ports:
+        - protocol: TCP
+          port: 8080
+    # prometheus scrape
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingress.fromMonitoringNamespace | quote }}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # DNS — kube-dns / coredns
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres
+      ports:
+        - protocol: TCP
+          port: {{ .Values.postgres.port }}
+    # Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: {{ .Values.redis.port }}
+    # Kafka — bootstrap port 추출 (host:port)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    {{- if .Values.networkPolicy.egress.allowVendorEgress }}
+    # vendor outbound (real 모드) — 0.0.0.0/0:443. cidr 좁히기는 prod 환경별 override 권장.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+{{- end }}
