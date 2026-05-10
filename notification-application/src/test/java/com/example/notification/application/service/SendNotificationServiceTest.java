@@ -124,7 +124,7 @@ class SendNotificationServiceTest {
         assertThat(result.dispatchedChannels()).isEmpty();
         assertThat(result.suppressionReason()).isEqualTo("OPT_OUT");
         verify(outboxPublisher, never()).publish(any(), any(), any());
-        verify(rateLimiter, never()).tryConsume(any(), any());
+        verify(rateLimiter, never()).tryConsumeAll(any(), any());
     }
 
     @Test
@@ -133,12 +133,40 @@ class SendNotificationServiceTest {
         when(recipientRepository.findById(USER)).thenReturn(Optional.of(recipient()));
         when(userPreferenceRepository.findByRecipientId(USER))
                 .thenReturn(Optional.of(UserPreference.defaults(USER)));
-        when(rateLimiter.tryConsume(eq(USER), any()))
-                .thenReturn(RateLimitDecision.deny(60_000));
+        when(deviceTokenRepository.findActiveByRecipientId(USER))
+                .thenReturn(List.of(token("d".repeat(160))));
+        // 한 채널이라도 거절이면 모두 deny — 묶음 단위 rejection 의도.
+        when(rateLimiter.tryConsumeAll(eq(USER), any()))
+                .thenAnswer(inv -> denyAllOf(inv.getArgument(1)));
 
         assertThatThrownBy(() -> service.send(rawCmdSecurity()))
                 .isInstanceOf(RateLimitExceededException.class);
         verify(notificationRepository, never()).save(any());
+    }
+
+    /**
+     * 핵심 회귀 락 — 다채널 fan-out 에서 한 채널이라도 토큰 부족이면 *나머지 채널 토큰도 차감
+     * 안 됨*. 채널별로 따로 호출하던 옛 코드는 channel#1 만 차감되고 throw 되어 leak.
+     */
+    @Test
+    void 다채널_차단_시_모든_채널_토큰_보존() {
+        Recipient r = recipient();
+        when(idempotencyStore.tryAcquire(any(), any())).thenReturn(true);
+        when(recipientRepository.findById(USER)).thenReturn(Optional.of(r));
+        when(userPreferenceRepository.findByRecipientId(USER))
+                .thenReturn(Optional.of(UserPreference.defaults(USER)));
+        when(deviceTokenRepository.findActiveByRecipientId(USER))
+                .thenReturn(List.of(token("d".repeat(160))));
+        // adapter 가 보장 — 차단 시 차감 없이 deny 반환. 본 테스트는 service 가 batch 호출 1회만
+        // 하는지 (개별 tryConsume 으로 leak 안 만드는지) 검증.
+        when(rateLimiter.tryConsumeAll(eq(USER), any()))
+                .thenAnswer(inv -> denyAllOf(inv.getArgument(1)));
+
+        assertThatThrownBy(() -> service.send(rawCmdSecurity()))
+                .isInstanceOf(RateLimitExceededException.class);
+
+        verify(rateLimiter, times(1)).tryConsumeAll(eq(USER), any());
+        verify(rateLimiter, never()).tryConsume(any(), any());
     }
 
     @Test
@@ -148,7 +176,8 @@ class SendNotificationServiceTest {
         when(recipientRepository.findById(USER)).thenReturn(Optional.of(r));
         when(userPreferenceRepository.findByRecipientId(USER))
                 .thenReturn(Optional.of(UserPreference.defaults(USER)));
-        when(rateLimiter.tryConsume(eq(USER), any())).thenReturn(RateLimitDecision.allow(9));
+        when(rateLimiter.tryConsumeAll(eq(USER), any()))
+                .thenAnswer(inv -> allowAllOf(inv.getArgument(1)));
         when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(deliveryAttemptRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
         when(deviceTokenRepository.findActiveByRecipientId(USER))
@@ -173,7 +202,8 @@ class SendNotificationServiceTest {
         when(recipientRepository.findById(USER)).thenReturn(Optional.of(r));
         when(userPreferenceRepository.findByRecipientId(USER))
                 .thenReturn(Optional.of(UserPreference.defaults(USER)));
-        when(rateLimiter.tryConsume(eq(USER), any())).thenReturn(RateLimitDecision.allow(9));
+        when(rateLimiter.tryConsumeAll(eq(USER), any()))
+                .thenAnswer(inv -> allowAllOf(inv.getArgument(1)));
         when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(deliveryAttemptRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
         // device 3개 등록 — push fan-out 3개로 늘어남
@@ -202,7 +232,8 @@ class SendNotificationServiceTest {
         when(recipientRepository.findById(USER)).thenReturn(Optional.of(r));
         when(userPreferenceRepository.findByRecipientId(USER))
                 .thenReturn(Optional.of(UserPreference.defaults(USER)));
-        when(rateLimiter.tryConsume(eq(USER), any())).thenReturn(RateLimitDecision.allow(9));
+        when(rateLimiter.tryConsumeAll(eq(USER), any()))
+                .thenAnswer(inv -> allowAllOf(inv.getArgument(1)));
         when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(deliveryAttemptRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
         when(deviceTokenRepository.findActiveByRecipientId(USER)).thenReturn(List.of());
@@ -227,7 +258,8 @@ class SendNotificationServiceTest {
         when(recipientRepository.findById(USER)).thenReturn(Optional.of(r));
         when(userPreferenceRepository.findByRecipientId(USER))
                 .thenReturn(Optional.of(UserPreference.defaults(USER)));
-        when(rateLimiter.tryConsume(eq(USER), any())).thenReturn(RateLimitDecision.allow(9));
+        when(rateLimiter.tryConsumeAll(eq(USER), any()))
+                .thenAnswer(inv -> allowAllOf(inv.getArgument(1)));
         when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(templateRepository.findWithFallback(any(), any(), any()))
                 .thenReturn(Optional.empty());
@@ -251,7 +283,8 @@ class SendNotificationServiceTest {
         when(recipientRepository.findById(USER)).thenReturn(Optional.of(r));
         when(userPreferenceRepository.findByRecipientId(USER))
                 .thenReturn(Optional.of(UserPreference.defaults(USER)));
-        when(rateLimiter.tryConsume(eq(USER), any())).thenReturn(RateLimitDecision.allow(9));
+        when(rateLimiter.tryConsumeAll(eq(USER), any()))
+                .thenAnswer(inv -> allowAllOf(inv.getArgument(1)));
         when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(deliveryAttemptRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
         Template tpl = Template.register(
@@ -309,5 +342,23 @@ class SendNotificationServiceTest {
                         new Channel(ChannelType.SMS, "+821012345678")),
                 Locale.KO_KR,
                 KST);
+    }
+
+    private static Map<ChannelType, RateLimitDecision> allowAllOf(
+            Map<ChannelType, Integer> demand) {
+        Map<ChannelType, RateLimitDecision> out = new java.util.EnumMap<>(ChannelType.class);
+        for (ChannelType t : demand.keySet()) {
+            out.put(t, RateLimitDecision.allow(9));
+        }
+        return out;
+    }
+
+    private static Map<ChannelType, RateLimitDecision> denyAllOf(
+            Map<ChannelType, Integer> demand) {
+        Map<ChannelType, RateLimitDecision> out = new java.util.EnumMap<>(ChannelType.class);
+        for (ChannelType t : demand.keySet()) {
+            out.put(t, RateLimitDecision.deny(60_000));
+        }
+        return out;
     }
 }
