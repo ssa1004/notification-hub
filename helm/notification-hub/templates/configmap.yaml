@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "notification-hub.fullname" . }}-config
+  labels:
+    {{- include "notification-hub.labels" . | nindent 4 }}
+data:
+  # 외부 의존 호스트 — 평문 ENV 로 주입해도 무방한 값.
+  DB_HOST: {{ .Values.postgres.host | quote }}
+  DB_PORT: {{ .Values.postgres.port | quote }}
+  DB_NAME: {{ .Values.postgres.database | quote }}
+  DB_POOL_MAX: {{ .Values.postgres.poolMax | quote }}
+  DB_POOL_MIN_IDLE: {{ .Values.postgres.poolMinIdle | quote }}
+  REDIS_HOST: {{ .Values.redis.host | quote }}
+  REDIS_PORT: {{ .Values.redis.port | quote }}
+  KAFKA_BOOTSTRAP: {{ .Values.kafka.bootstrap | quote }}
+  # vendor mock 모드일 때 application.yml 의 vendor.* failure-rate 를 ENV 로 override.
+  # 실 모드 (vendor.mode=real) 에서도 0.0 으로 두는 게 맞음.
+  VENDOR_FCM_FAILURE_RATE: {{ .Values.vendor.mock.fcmFailureRate | quote }}
+  VENDOR_SES_FAILURE_RATE: {{ .Values.vendor.mock.sesFailureRate | quote }}
+  VENDOR_TWILIO_FAILURE_RATE: {{ .Values.vendor.mock.twilioFailureRate | quote }}
+  VENDOR_KAKAO_FAILURE_RATE: {{ .Values.vendor.mock.kakaoFailureRate | quote }}
+  VENDOR_KAKAO_ENFORCE_NIGHT_BLOCK: {{ .Values.vendor.mock.kakaoEnforceNightBlock | quote }}
+  # vendor 동작 모드 — 애플리케이션 측에서 mock vs real adapter 선택에 사용 가능.
+  VENDOR_MODE: {{ .Values.vendor.mode | quote }}
