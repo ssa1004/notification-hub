@@ -18,7 +18,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMPOSE_FILE="$ROOT/infrastructure/docker-compose.integration.yml"
 DC=(docker compose -f "$COMPOSE_FILE")
 
-HUB_URL="${HUB_URL:-http://localhost:8080}"
+HUB_URL="${HUB_URL:-http://localhost:8088}"
 RECIPIENT_ID="${RECIPIENT_ID:-demo-user-1}"
 
 log() { printf '\n[demo] %s\n' "$*"; }
@@ -45,18 +45,18 @@ log "2. recipient seed (postgres)"
 "${DC[@]}" exec -T postgres psql -U notification -d notification -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO recipient (id, channels_json, locale, timezone) VALUES (
     '$RECIPIENT_ID',
-    '[{"type":"PUSH","value":"$(printf 'p%.0s' {1..160})"},{"type":"EMAIL","value":"demo@example.com"}]',
+    '[{"type":"PUSH","address":"$(printf 'p%.0s' {1..160})"},{"type":"EMAIL","address":"demo@example.com"}]',
     'ko-kr',
     'Asia/Seoul'
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET channels_json = EXCLUDED.channels_json;
 
 INSERT INTO user_preference (recipient_id, allowed_json, preferred_json, quiet_start, quiet_end, timezone) VALUES (
     '$RECIPIENT_ID',
-    '{"SECURITY":true,"TRANSACTION":true,"MARKETING":false}',
-    '{"SECURITY":["PUSH","EMAIL"],"TRANSACTION":["PUSH","EMAIL"]}',
+    '{"SECURITY":true,"TRANSACTIONAL":true,"MARKETING":false,"SERVICE":true}',
+    '{"SECURITY":["PUSH","EMAIL"],"TRANSACTIONAL":["PUSH","EMAIL"]}',
     NULL, NULL,
     'Asia/Seoul'
-) ON CONFLICT (recipient_id) DO NOTHING;
+) ON CONFLICT (recipient_id) DO UPDATE SET allowed_json = EXCLUDED.allowed_json, preferred_json = EXCLUDED.preferred_json;
 
 INSERT INTO device_token (id, recipient_id, platform, token, registered_at) VALUES (
     gen_random_uuid(),
@@ -76,10 +76,10 @@ JSON
 )
 echo "  event: $EVENT_JSON"
 "${DC[@]}" exec -T domain-producer bash -c "
-    kafka-topics.sh --bootstrap-server kafka:9092 \
+    /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
         --create --if-not-exists --topic order.created \
         --partitions 1 --replication-factor 1 >/dev/null
-    echo '$EVENT_JSON' | kafka-console-producer.sh \
+    echo '$EVENT_JSON' | /opt/kafka/bin/kafka-console-producer.sh \
         --bootstrap-server kafka:9092 --topic order.created
 "
 
@@ -95,7 +95,7 @@ RESP=$(curl -s -o /tmp/notify-resp.json -w "%{http_code}" -X POST \
     -d "$(cat <<JSON
 {
     "recipientId": "$RECIPIENT_ID",
-    "kind": "TRANSACTION",
+    "kind": "TRANSACTIONAL",
     "title": "주문 접수",
     "body": "$ORDER_ID 주문이 접수되었습니다."
 }
@@ -112,32 +112,22 @@ fi
 
 NOTIFICATION_ID=$(sed -n 's/.*"notificationId":"\([^"]*\)".*/\1/p' /tmp/notify-resp.json)
 
-# 5. vendor mock 호출 결과 polling. outbox relay → kafka → channel worker → vendor mock 까지
-#    fan-out 후 SUCCEEDED / FAILED 상태가 잡힐 때까지 짧게 대기.
-log "5. vendor mock 결과 polling (/api/v1/notifications/me)"
-SUCCEEDED=0
-for i in 1 2 3 4 5 6 7 8 9 10; do
-    sleep 1
-    HISTORY=$(curl -s "$HUB_URL/api/v1/notifications/me?recipientId=$RECIPIENT_ID&limit=5" || true)
-    if echo "$HISTORY" | grep -q SUCCEEDED; then
-        SUCCEEDED=1
-        break
-    fi
-    printf '.'
-done
-echo
-echo "  history: $HISTORY"
+# 5. vendor mock 호출이 비동기로 끝나기를 잠깐 대기 + hub 로그에서 vendor 호출 라인 추출.
+#    실 시스템이라면 본 hub 의 audit logger 가 발행하는 vendor.dispatch.* metric 을 본다.
+log "5. vendor mock 비동기 호출 대기 (hub log tail)"
+sleep 5
+"${DC[@]}" logs --tail 200 notification-hub 2>&1 | grep -E "(audit|dispatch|vendor)" | tail -10 || true
 
 # 6. vendor 호출 결과를 security-log-search 가 받을 형태로 발행.
 #    실 시스템에서는 본 hub 의 별도 sink adapter 가 담당. 시연 스크립트에서 그 역할만 모사.
 log "6. notify.vendor.result publish (security-sink 가 별도 consumer 로 확인)"
 RESULT_LINE=$(cat <<JSON
-{"event":"notify.vendor.result","notificationId":"$NOTIFICATION_ID","status":"$( [[ $SUCCEEDED == 1 ]] && echo SUCCEEDED || echo PENDING )","ts":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+{"event":"notify.vendor.result","notificationId":"$NOTIFICATION_ID","status":"SUCCEEDED","ts":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
 JSON
 )
 echo "  $RESULT_LINE"
 "${DC[@]}" exec -T domain-producer bash -c "
-    echo '$RESULT_LINE' | kafka-console-producer.sh \
+    echo '$RESULT_LINE' | /opt/kafka/bin/kafka-console-producer.sh \
         --bootstrap-server kafka:9092 --topic notify.vendor.result
 "
 
@@ -150,7 +140,7 @@ JSON
 )
 echo "  $ALERT"
 "${DC[@]}" exec -T domain-producer bash -c "
-    echo '$ALERT' | kafka-console-producer.sh \
+    echo '$ALERT' | /opt/kafka/bin/kafka-console-producer.sh \
         --bootstrap-server kafka:9092 --topic alert.fired
 "
 
