@@ -1,0 +1,20 @@
+apiVersion: v2
+name: notification-hub
+description: 다채널 알림 발송 hub (PUSH / EMAIL / SMS / KAKAO) Helm chart
+type: application
+# chart 자체 버전 — 차트 구조가 바뀔 때 올림
+version: 0.1.0
+# 배포 대상 애플리케이션 버전 — image.tag default 와 동기화
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+keywords:
+  - notification
+  - multi-channel
+  - kafka
+  - outbox
+home: https://github.com/ssa1004/notification-hub
+sources:
+  - https://github.com/ssa1004/notification-hub
+maintainers:
+  - name: ssa1004
+    email: wittyahn@users.noreply.github.com
