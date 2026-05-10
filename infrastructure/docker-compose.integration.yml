@@ -1,0 +1,115 @@
+# Cross-repo 통합 시연용 compose.
+#
+# - notification-hub (본 저장소) 본체 + Postgres / Redis / Kafka
+# - auth-stub: auth-service 의 JWK Set 노출만 모사 (정적 nginx)
+# - domain-producer: 도메인 service 가 발행할 sample event 를 Kafka / REST 로 발사할 도구
+#                    (스크립트는 docker exec 로 트리거)
+# - security-sink: security-log-search 가 받을 alert.fired topic 을 tail 하는 listener
+#
+# 실 운영 구성이 아닙니다. 8 레포를 모두 띄우지 않고 cross-repo 흐름만 닫아 시연하기 위한
+# stub 묶음입니다.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: notification
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: notification
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "notification"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+
+  kafka:
+    image: bitnami/kafka:3.7
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_CFG_BROKER_ID: "1"
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  notification-hub:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_USER: notification
+      DB_PASSWORD: notification
+      DB_NAME: notification
+      REDIS_HOST: redis
+      KAFKA_BOOTSTRAP: kafka:9092
+      # 시연 한정: auth-stub 의 JWK Set 위치. 본 저장소가 실제 JWT 검증을 활성화하면
+      # 이 값을 spring.security.oauth2.resourceserver.jwt.jwk-set-uri 로 매핑.
+      AUTH_JWKS_URI: http://auth-stub:8080/.well-known/jwks.json
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      auth-stub: { condition: service_started }
+
+  # auth-service stub — JWK Set 만 정적으로 서비스. 실제 토큰 발급은 demo 스크립트가
+  # 평문 mock JWT 를 만들어 사용.
+  auth-stub:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./integration/auth-stub/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./integration/auth-stub/jwks.json:/usr/share/nginx/html/jwks.json:ro
+    ports: ["8085:8080"]
+
+  # 도메인 event producer stub — idle 컨테이너 안에 kafka client + curl 만 있으면 충분.
+  # demo 스크립트가 docker exec 로 produce / curl 명령 실행.
+  domain-producer:
+    image: bitnami/kafka:3.7
+    depends_on:
+      kafka: { condition: service_healthy }
+      notification-hub: { condition: service_started }
+    entrypoint: ["sleep", "infinity"]
+
+  # security-log-search stub — alert.fired topic 을 stdout 으로 echo.
+  # 실제 security-log-search 는 이걸 ECS / OCSF 로 정규화해 OpenSearch + ClickHouse 에 적재.
+  # vendor 호출 결과 topic (notify.vendor.result) 은 demo 스크립트가 별도 consumer 로 확인.
+  security-sink:
+    image: bitnami/kafka:3.7
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint:
+      - bash
+      - -c
+      - |
+        # topic 이 아직 없을 수 있으므로 우선 생성 (idempotent).
+        kafka-topics.sh --bootstrap-server kafka:9092 \
+          --create --if-not-exists --topic alert.fired \
+          --partitions 1 --replication-factor 1
+        kafka-topics.sh --bootstrap-server kafka:9092 \
+          --create --if-not-exists --topic notify.vendor.result \
+          --partitions 1 --replication-factor 1
+        echo "[security-sink] tailing alert.fired"
+        kafka-console-consumer.sh --bootstrap-server kafka:9092 \
+          --topic alert.fired \
+          --from-beginning \
+          --property print.key=true --property print.timestamp=true
