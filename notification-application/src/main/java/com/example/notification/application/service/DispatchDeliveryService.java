@@ -4,6 +4,7 @@ import com.example.notification.application.port.in.DispatchDeliveryUseCase;
 import com.example.notification.application.port.out.DeliveryAttemptRepository;
 import com.example.notification.application.port.out.DeliveryGateway;
 import com.example.notification.application.port.out.DeviceTokenRepository;
+import com.example.notification.application.port.out.InvalidRecipientFailure;
 import com.example.notification.application.port.out.PermanentDeliveryFailure;
 import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.delivery.DeliveryAttempt;
@@ -87,13 +88,15 @@ public class DispatchDeliveryService implements DispatchDeliveryUseCase {
             log.warn("vendor failure id={} reason={}", attempt.id(), ex.getMessage());
             attempt.markFailed(prefix + ex.getMessage());
 
-            // PUSH 채널 + permanent (NOT_REGISTERED 등) → device token 비활성화. 이 user 의
-            // 다음 알림 fan-out 에서 이 token 으로 attempt 안 만듦.
-            if (permanent && attempt.channel().type() == ChannelType.PUSH) {
+            // PUSH 채널 + 수신자 식별자 자체 무효 (NOT_REGISTERED 등) → device token 비활성화.
+            // 같은 영구 실패라도 payload 형식 오류 (FCM INVALID_ARGUMENT 등) 는 토큰 자체는
+            // 멀쩡하므로 비활성화하면 안 된다 — 좁은 마커 InvalidRecipientFailure 로 분기.
+            boolean recipientInvalid = ex instanceof InvalidRecipientFailure;
+            if (recipientInvalid && attempt.channel().type() == ChannelType.PUSH) {
                 try {
                     deviceTokenRepository.deactivateByToken(attempt.channel().address());
                     log.info(
-                            "device token 비활성화 (vendor 영구 실패) attemptId={} reason={}",
+                            "device token 비활성화 (수신자 식별자 무효) attemptId={} reason={}",
                             attempt.id(),
                             ex.getMessage());
                 } catch (RuntimeException dx) {
