@@ -41,12 +41,37 @@ class MockVendorClientTest {
         MockFcmClient sut = new MockFcmClient();
         setFailureRate(sut, 1.0);
 
-        // Permanent 2종 (NOT_REGISTERED / INVALID_ARGUMENT) + Transient + IOException = 4종 분기.
+        // 4종 분기: NOT_REGISTERED (InvalidRecipient) / INVALID_ARGUMENT (Permanent) /
+        // 5xx Transient / IOException. InvalidRecipient 는 Permanent 의 subtype 이라 isInstanceOf
+        // 으로도 잡힘.
         assertThatThrownBy(() -> sut.dispatch(pushAttempt()))
                 .satisfiesAnyOf(
                         ex -> assertThat(ex).isInstanceOf(VendorPermanentException.class),
                         ex -> assertThat(ex).isInstanceOf(VendorTransientException.class),
                         ex -> assertThat(ex).isInstanceOf(UncheckedIOException.class));
+    }
+
+    /**
+     * 회귀 락 — FCM 의 NOT_REGISTERED 분기는 더 좁은 {@link VendorInvalidRecipientException}
+     * 으로 던져야 한다 (token 비활성화 트리거). INVALID_ARGUMENT 는 일반
+     * {@link VendorPermanentException} 만 — token 자체는 멀쩡. 둘이 섞이면 잘못된 payload 한
+     * 번에 사용자의 device token 이 비활성화되는 회귀가 다시 들어옴.
+     */
+    @org.junit.jupiter.api.RepeatedTest(80)
+    void FCM_NOT_REGISTERED_는_VendorInvalidRecipientException_타입() {
+        MockFcmClient sut = new MockFcmClient();
+        setFailureRate(sut, 1.0);
+        try {
+            sut.dispatch(pushAttempt());
+        } catch (VendorInvalidRecipientException ex) {
+            assertThat(ex.getMessage()).contains("not-registered");
+        } catch (VendorPermanentException ex) {
+            // INVALID_ARGUMENT — InvalidRecipient 가 아니어야 한다.
+            assertThat(ex).isNotInstanceOf(VendorInvalidRecipientException.class);
+            assertThat(ex.getMessage()).contains("invalid-argument");
+        } catch (VendorTransientException | UncheckedIOException ignored) {
+            // transient / IO 케이스 — 본 테스트 대상 아님.
+        }
     }
 
     @Test

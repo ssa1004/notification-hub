@@ -21,8 +21,10 @@ import org.springframework.stereotype.Component;
  * <p>{@code vendor.fcm.failure-rate} (0.0~1.0) 비율로 무작위 실패. 실패는 4가지 케이스 중 하나:
  *
  * <ul>
- *   <li>{@link VendorPermanentException} — NOT_REGISTERED (단말 토큰 만료/제거). retry 무의미.
- *   <li>{@link VendorPermanentException} — INVALID_ARGUMENT (페이로드 형식 오류). retry 무의미.
+ *   <li>{@link VendorInvalidRecipientException} — NOT_REGISTERED (단말 토큰 unregister).
+ *       retry 무의미 + token 비활성화 대상.
+ *   <li>{@link VendorPermanentException} — INVALID_ARGUMENT (페이로드 형식 오류). retry 무의미
+ *       하지만 token 자체는 멀쩡 — 비활성화 X.
  *   <li>{@link VendorTransientException} — UNAVAILABLE (5xx). Resilience4j retry 대상.
  *   <li>{@link UncheckedIOException} — connection reset. Resilience4j retry 대상.
  * </ul>
@@ -50,9 +52,9 @@ public class MockFcmClient implements DeliveryGateway {
             switch (kind) {
                 case 0 -> {
                     log.warn(
-                            "[MockFcmClient] 영구 오류 (NOT_REGISTERED) attemptId={}",
+                            "[MockFcmClient] 수신자 무효 (NOT_REGISTERED) attemptId={}",
                             attempt.id());
-                    throw new VendorPermanentException(
+                    throw new VendorInvalidRecipientException(
                             "FCM messaging/registration-token-not-registered");
                 }
                 case 1 -> {

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.example.notification.application.port.out.DeliveryAttemptRepository;
 import com.example.notification.application.port.out.DeliveryGateway;
 import com.example.notification.application.port.out.DeviceTokenRepository;
+import com.example.notification.application.port.out.InvalidRecipientFailure;
 import com.example.notification.application.port.out.PermanentDeliveryFailure;
 import com.example.notification.domain.channel.Channel;
 import com.example.notification.domain.channel.ChannelType;
@@ -53,16 +54,36 @@ class DispatchDeliveryServiceTest {
     }
 
     @Test
-    void PUSH_영구_실패_시_device_token_비활성화() {
+    void PUSH_수신자_무효_실패_시_device_token_비활성화() {
         DeliveryAttempt a = newPushAttempt();
         when(repository.findById(a.id())).thenReturn(Optional.of(a));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(pushGateway.dispatch(any()))
-                .thenThrow(new TestPermanentFailure("FCM NOT_REGISTERED"));
+                .thenThrow(new TestInvalidRecipientFailure("FCM NOT_REGISTERED"));
 
         service.dispatch(a.id());
 
         verify(deviceTokenRepository).deactivateByToken(a.channel().address());
+        assertThat(a.failureReason()).contains("permanent");
+    }
+
+    /**
+     * 핵심 회귀 — payload 형식 오류 (FCM INVALID_ARGUMENT 등) 는 영구 실패지만 token 자체는
+     * 멀쩡하다. PermanentDeliveryFailure 만 보고 무차별 비활성화하면 잘못된 payload 한 번 때문에
+     * 사용자의 PUSH 채널이 통째로 끊긴다 — 좁은 마커 InvalidRecipientFailure 만 비활성화 트리거.
+     */
+    @Test
+    void PUSH_payload_영구_실패_는_token_비활성화_안_함() {
+        DeliveryAttempt a = newPushAttempt();
+        when(repository.findById(a.id())).thenReturn(Optional.of(a));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(pushGateway.dispatch(any()))
+                .thenThrow(new TestPermanentFailure("FCM INVALID_ARGUMENT"));
+
+        service.dispatch(a.id());
+
+        verify(deviceTokenRepository, never()).deactivateByToken(any());
+        // 영구 실패 마킹은 그대로 — retry 안 함.
         assertThat(a.failureReason()).contains("permanent");
     }
 
@@ -187,6 +208,17 @@ class DispatchDeliveryServiceTest {
     static final class TestPermanentFailure extends RuntimeException
             implements PermanentDeliveryFailure {
         TestPermanentFailure(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * 테스트 전용 — 수신자 식별자 자체가 무효임을 알리는 좁은 마커 {@link InvalidRecipientFailure}
+     * 분기까지 검증.
+     */
+    static final class TestInvalidRecipientFailure extends RuntimeException
+            implements InvalidRecipientFailure {
+        TestInvalidRecipientFailure(String message) {
             super(message);
         }
     }

@@ -25,7 +25,8 @@ import org.springframework.stereotype.Component;
  * <p>실패 케이스:
  *
  * <ul>
- *   <li>{@link VendorPermanentException} — Invalid 'To' Number (잘못된 형식). retry 무의미.
+ *   <li>{@link VendorInvalidRecipientException} — Invalid 'To' Number (잘못된 형식). retry
+ *       무의미. SMS 는 token 비활성화 분기를 안 타지만 의미적으로 식별자 무효 신호.
  *   <li>{@link VendorTransientException} — 5xx (vendor 측 일시 오류). retry 대상.
  *   <li>{@link UncheckedIOException} — connection reset. retry 대상.
  * </ul>
@@ -55,9 +56,9 @@ public class MockTwilioClient implements DeliveryGateway {
             switch (kind) {
                 case 0 -> {
                     log.warn(
-                            "[MockTwilioClient] 영구 오류 (Invalid 'To' Number) attemptId={}",
+                            "[MockTwilioClient] 수신자 무효 (Invalid 'To' Number) attemptId={}",
                             attempt.id());
-                    throw new VendorPermanentException(
+                    throw new VendorInvalidRecipientException(
                             "Twilio 21211: Invalid 'To' phone number");
                 }
                 case 1 -> {
