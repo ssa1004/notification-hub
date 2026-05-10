@@ -30,25 +30,29 @@ services:
       timeout: 3s
       retries: 5
 
-  zookeeper:
-    image: bitnami/zookeeper:3.9
-    environment:
-      ALLOW_ANONYMOUS_LOGIN: "yes"
-
+  # Kafka KRaft (broker + controller 단일 노드). zookeeper 분리 없이 시연 단순화.
   kafka:
-    image: bitnami/kafka:3.7
-    depends_on: [zookeeper]
+    image: apache/kafka:3.7.0
     environment:
-      KAFKA_CFG_BROKER_ID: "1"
-      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 15
+      start_period: 20s
 
   notification-hub:
     build:
@@ -65,7 +69,7 @@ services:
       # 시연 한정: auth-stub 의 JWK Set 위치. 본 저장소가 실제 JWT 검증을 활성화하면
       # 이 값을 spring.security.oauth2.resourceserver.jwt.jwk-set-uri 로 매핑.
       AUTH_JWKS_URI: http://auth-stub:8080/.well-known/jwks.json
-    ports: ["8080:8080"]
+    ports: ["8088:8080"]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -75,26 +79,26 @@ services:
   # auth-service stub — JWK Set 만 정적으로 서비스. 실제 토큰 발급은 demo 스크립트가
   # 평문 mock JWT 를 만들어 사용.
   auth-stub:
-    image: nginx:1.27-alpine
-    volumes:
-      - ./integration/auth-stub/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./integration/auth-stub/jwks.json:/usr/share/nginx/html/jwks.json:ro
+    build:
+      context: ./integration/auth-stub
     ports: ["8085:8080"]
 
-  # 도메인 event producer stub — idle 컨테이너 안에 kafka client + curl 만 있으면 충분.
-  # demo 스크립트가 docker exec 로 produce / curl 명령 실행.
+  # 도메인 event producer stub — idle 컨테이너 안에 kafka cli 만 있으면 충분.
+  # demo 스크립트가 docker exec 로 produce 명령 실행. PATH 에 /opt/kafka/bin 포함.
   domain-producer:
-    image: bitnami/kafka:3.7
+    image: apache/kafka:3.7.0
     depends_on:
       kafka: { condition: service_healthy }
       notification-hub: { condition: service_started }
+    environment:
+      PATH: /opt/kafka/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     entrypoint: ["sleep", "infinity"]
 
   # security-log-search stub — alert.fired topic 을 stdout 으로 echo.
   # 실제 security-log-search 는 이걸 ECS / OCSF 로 정규화해 OpenSearch + ClickHouse 에 적재.
   # vendor 호출 결과 topic (notify.vendor.result) 은 demo 스크립트가 별도 consumer 로 확인.
   security-sink:
-    image: bitnami/kafka:3.7
+    image: apache/kafka:3.7.0
     depends_on:
       kafka: { condition: service_healthy }
     entrypoint:
@@ -102,14 +106,14 @@ services:
       - -c
       - |
         # topic 이 아직 없을 수 있으므로 우선 생성 (idempotent).
-        kafka-topics.sh --bootstrap-server kafka:9092 \
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
           --create --if-not-exists --topic alert.fired \
           --partitions 1 --replication-factor 1
-        kafka-topics.sh --bootstrap-server kafka:9092 \
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
           --create --if-not-exists --topic notify.vendor.result \
           --partitions 1 --replication-factor 1
         echo "[security-sink] tailing alert.fired"
-        kafka-console-consumer.sh --bootstrap-server kafka:9092 \
+        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:9092 \
           --topic alert.fired \
           --from-beginning \
           --property print.key=true --property print.timestamp=true
