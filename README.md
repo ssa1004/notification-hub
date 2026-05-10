@@ -258,6 +258,72 @@ curl -s -X POST http://localhost:8080/api/v1/templates \
 
 ---
 
+## Portfolio Set 통합
+
+이 저장소는 8개 백엔드 저장소가 한 시스템처럼 동작하도록 묶인 포트폴리오 셋의 한
+구성 요소입니다. profile 인덱스: <https://github.com/ssa1004/ssa1004>
+
+| 저장소 | 역할 | notification-hub 와의 관계 |
+|---|---|---|
+| `auth-service` | OAuth2 / OIDC IdP — JWT 발행 + JWK 노출 | 본 hub 의 REST API 가 검증하는 JWT 의 issuer |
+| `security-log-search` | SIEM (보안 로그 정규화 + 검색 + 알람) | 본 hub 의 vendor 호출 결과 / `alert.fired` 의 sink |
+| `resell-orderbook` | 한정판 리셀 거래소 | `order.created` 등 도메인 event 의 producer (구매자 알림) |
+| `billing-platform` | B2B SaaS 결제 / 청구 / 정산 | `payment.succeeded` 등 도메인 event 의 producer (영수증 알림) |
+| `gpu-job-orchestrator` | GPU job 관리 백엔드 | `job.completed` event producer (작업 완료 알림) |
+| `search-service` | commerce 상품 검색 백엔드 | `index.reindex.failed` 등 운영 알림 producer |
+| `mini-shop-observability` | 자체 Spring observability 모듈 + MSA 플레이그라운드 | tracing / metric 라이브러리 컨벤션 공유 |
+| `notification-hub` | (본 저장소) 다채널 알림 발송 hub | 위 도메인 service 의 알림 fan-out + 운영 alert 의 sink-or-source |
+
+### 통합 흐름
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Domain as 도메인 service<br/>(resell / billing / gpu / search)
+    participant Auth as auth-service<br/>(JWK Set)
+    participant Hub as notification-hub
+    participant Vendor as vendor mock<br/>(FCM/SES/Twilio/Kakao)
+    participant Sink as security-log-search<br/>(alert.fired sink)
+
+    Domain->>Auth: 1. service-account JWT 발급
+    Domain->>Hub: 2. POST /api/v1/notifications<br/>(Bearer JWT, Idempotency-Key)
+    Hub->>Auth: 3. JWK Set 으로 서명 검증
+    Hub->>Hub: 4. preference / DND / rate limit / fan-out
+    Hub-->>Domain: 5. 202 ACCEPTED
+    Note over Hub,Vendor: Outbox relay → Kafka → channel worker
+    Hub->>Vendor: 6. dispatch (Resilience4j retry 3회)
+    alt 성공
+        Vendor-->>Hub: vendor message id
+        Hub->>Sink: 7a. notify.vendor.result = SUCCEEDED
+    else 영구 실패 (EXHAUSTED)
+        Hub->>Sink: 7b. alert.fired = NOTIFY_VENDOR_EXHAUSTED
+    end
+```
+
+### 시연 — `docker-compose.integration.yml`
+
+전 8 레포를 같이 띄우지 않고도, stub 으로 cross-repo 흐름만 닫아 한 호스트에서 시연
+가능한 compose 파일을 제공합니다.
+
+- `infrastructure/docker-compose.integration.yml`
+  - `notification-hub` (Postgres + Redis + Kafka)
+  - `auth-stub` — JWK Set 만 노출하는 정적 nginx (auth-service 의 `/.well-known/jwks.json` 모사)
+  - `domain-event-producer` — `order.created` sample event 를 본 hub 의 REST 로 발사
+  - `security-sink` — Kafka topic `alert.fired` consume 후 stdout 로 echo
+
+- `scripts/integration-demo.sh` — 위 compose 를 띄우고 sample event 한 사이클을
+  돌려서 vendor mock 호출 결과와 sink 도달까지 stdout 으로 확인.
+
+```bash
+docker compose -f infrastructure/docker-compose.integration.yml up -d
+./scripts/integration-demo.sh
+```
+
+Cross-repo 통합은 어디까지나 *스펙 시연* 용입니다. 실제 운영에서는 각 저장소를 별도
+배포하고 Kubernetes Service / Kafka cluster 를 매개로 연결합니다.
+
+---
+
 ## 저장소 / push
 
 이 저장소는 GitHub `ssa1004/notification-hub` 으로 push 되어 있습니다. 새로 clone 후
