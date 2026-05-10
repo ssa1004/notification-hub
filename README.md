@@ -247,6 +247,64 @@ curl -s -X POST http://localhost:8080/api/v1/templates \
 - Resilience4j retry (vendor 호출 단계 3회 재시도)
 - Rate limit (Redis 기반 token bucket) 활성화
 
+## Kubernetes 배포 (Helm)
+
+`infrastructure/k8s/` 의 raw manifest 와 같은 구조를 `helm/notification-hub/` chart 로
+패키징해 두었습니다. 운영은 chart 기준이고, raw manifest 는 학습용 / 단순 참고용입니다.
+
+```
+helm/notification-hub/
+├── Chart.yaml
+├── values.yaml          # dev / 로컬 검증 default
+├── values-prod.yaml     # prod override (replicas 3, HPA, ingress TLS, NetworkPolicy)
+└── templates/
+    ├── _helpers.tpl
+    ├── configmap.yaml
+    ├── deployment.yaml
+    ├── hpa.yaml
+    ├── ingress.yaml
+    ├── networkpolicy.yaml
+    ├── pdb.yaml
+    ├── secret.yaml
+    ├── service.yaml
+    └── serviceaccount.yaml
+```
+
+설계 요점:
+
+- **Probes 3종 분리** — startup (Flyway + 컨텍스트 부팅 ≈ 2분 허용), readiness (Kafka/Redis
+  포함 외부 의존), liveness (process alive 만). 자세한 의도는 [ADR 0009](docs/adr/0009-k8s-probes.md).
+- **Graceful shutdown** — preStop sleep 5s + Spring `server.shutdown=graceful` 25s = 합 30s
+  안에 in-flight 요청 정리. terminationGracePeriodSeconds 도 30s 로 동기화. 자세히는
+  [ADR 0010](docs/adr/0010-graceful-shutdown.md).
+- **Vendor mode** — `vendor.mode=mock` (dev) 와 `real` (prod) 분리. real 모드에서만
+  vendor 자격 증명 secret (FCM JSON / SES key / Twilio token / Kakao key) 이 envFrom 으로 주입됨.
+- **Secret 모드** — `secrets.mode=create` 는 dev 평문 (chart 가 직접 Secret 생성), `external` 은
+  KMS / Vault / ExternalSecrets operator 가 미리 만든 Secret 을 `existingSecretName` 으로 참조.
+  prod 는 무조건 external.
+- **Ingress path 3 분리** — `/api/v1/notifications/*` (호출 서비스), `/api/v1/admin/*` (운영자
+  토큰 보호), `/webhooks/*` (vendor 콜백, HMAC 서명 검증).
+- **HPA / PDB / NetworkPolicy** — prod 만 HPA (CPU 70%, min 2 max 10) + NetworkPolicy 활성.
+  PDB 는 replica ≥ 2 일 때만 의미 있어 자동 skip 분기.
+
+```bash
+# 검증
+helm lint helm/notification-hub
+helm lint helm/notification-hub --values helm/notification-hub/values-prod.yaml
+helm template release-name helm/notification-hub --values helm/notification-hub/values-prod.yaml
+
+# dev 설치
+helm upgrade --install notification-hub helm/notification-hub \
+  --namespace notification --create-namespace
+
+# prod 설치 (Secret 은 ExternalSecrets / KMS 로 미리 동기화 가정)
+helm upgrade --install notification-hub helm/notification-hub \
+  --namespace notification --create-namespace \
+  --values helm/notification-hub/values.yaml \
+  --values helm/notification-hub/values-prod.yaml \
+  --set image.tag=$IMAGE_TAG
+```
+
 ## 향후 개선 사항
 
 - vendor adapter 실 SDK 화 — 학습 단계의 Mock 4종을 실제 SDK 로 교체
