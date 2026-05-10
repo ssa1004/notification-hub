@@ -1,0 +1,30 @@
+notification-hub {{ .Chart.AppVersion }} (release {{ .Release.Name }}) 가 namespace {{ .Release.Namespace }} 에 배포되었습니다.
+
+1. pod 상태 확인:
+   kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+2. 로그 확인:
+   kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/instance={{ .Release.Name }} --tail=100 -f
+
+3. 접근:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+   - host: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- range .paths }}
+       {{ .path }}
+{{- end }}
+{{- end }}
+{{- else }}
+   ingress 비활성. ClusterIP 만 노출 — port-forward 로 접근:
+     kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "notification-hub.fullname" . }} 8080:{{ .Values.service.port }}
+{{- end }}
+
+4. health:
+   /actuator/health/readiness  /actuator/health/liveness  /actuator/prometheus
+
+5. vendor 모드: {{ .Values.vendor.mode }}
+{{- if eq .Values.vendor.mode "real" }}
+   real 모드 — secrets.vendor.* 가 secret 으로 주입되어야 정상 동작 (mode=external 권장).
+{{- else }}
+   mock 모드 — vendor 호출은 빌트인 mock 으로 처리 (vendor secret 무시).
+{{- end }}
