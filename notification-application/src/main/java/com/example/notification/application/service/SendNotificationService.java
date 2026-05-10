@@ -124,11 +124,19 @@ public class SendNotificationService implements SendNotificationUseCase {
                     reason);
         }
 
-        // Rate limit — 하나라도 차단되면 묶음 자체 거절. 부분 발송은 사용자 혼란 유발.
+        // Rate limit — 묶음 자체 거절. 채널별로 따로 tryConsume 하면 channel#1 통과 (토큰
+        // 차감) 후 channel#2 거절 시 channel#1 토큰만 부분 소진되는 leak 발생. 원자 batch 로
+        // "전부 가능하면 일괄 차감 / 하나라도 부족하면 모두 그대로 둠" 보장 (Redis Lua).
+        java.util.Map<ChannelType, Integer> demand = new java.util.EnumMap<>(ChannelType.class);
         for (Channel ch : channels) {
-            RateLimitDecision decision = rateLimiter.tryConsume(recipientId, ch.type());
-            if (!decision.allowed()) {
-                throw new RateLimitExceededException(ch.type().name(), decision.retryAfterMillis());
+            demand.merge(ch.type(), 1, Integer::sum);
+        }
+        java.util.Map<ChannelType, RateLimitDecision> decisions =
+                rateLimiter.tryConsumeAll(recipientId, demand);
+        for (java.util.Map.Entry<ChannelType, RateLimitDecision> e : decisions.entrySet()) {
+            if (!e.getValue().allowed()) {
+                throw new RateLimitExceededException(
+                        e.getKey().name(), e.getValue().retryAfterMillis());
             }
         }
 
