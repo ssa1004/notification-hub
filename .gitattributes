@@ -1,0 +1,47 @@
+# 기본: 자동 감지 + commit 시 LF 정규화
+* text=auto eol=lf
+
+# 명시적 텍스트
+*.java       text eol=lf
+*.kt         text eol=lf
+*.kts        text eol=lf
+*.gradle     text eol=lf
+*.properties text eol=lf
+*.yml        text eol=lf
+*.yaml       text eol=lf
+*.json       text eol=lf
+*.xml        text eol=lf
+*.md         text eol=lf
+*.sh         text eol=lf
+*.sql        text eol=lf
+*.toml       text eol=lf
+Dockerfile   text eol=lf
+*.tpl        text eol=lf
+
+# Windows 전용 — CRLF 유지
+*.bat        text eol=crlf
+*.cmd        text eol=crlf
+
+# 바이너리
+*.jar        binary
+*.war        binary
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.gif        binary
+*.ico        binary
+*.zip        binary
+*.gz         binary
+*.tar        binary
+*.p12        binary
+*.jks        binary
+*.keystore   binary
+
+# Gradle wrapper jar — 바이너리, diff 노이즈 차단
+gradle/wrapper/gradle-wrapper.jar binary
+
+# Linguist — 통계에서 제외할 경로
+docs/**           linguist-documentation
+infrastructure/** linguist-vendored
+helm/**           linguist-vendored
+gradle/**         linguist-vendored
