@@ -4,15 +4,15 @@
 적용
 
 ## 배경
-초기 구현은 한 사용자의 PUSH 채널을 *1개* 만 사용 — `Recipient.channels` 의 placeholder PUSH
+초기 구현은 한 사용자의 PUSH 채널을 1개만 사용 — `Recipient.channels` 의 placeholder PUSH
 주소 하나만. 실제로는:
 
-- 한 사용자가 핸드폰 + 태블릿 + 웹 등 *여러 device* 보유. OTP 같은 보안 알림은 모든 device 에
-  전송되어야 사용자가 어디서든 받을 수 있음.
+- 한 사용자가 핸드폰 + 태블릿 + 웹 등 여러 device 를 보유. OTP 같은 보안 알림은 모든 device
+  에 전송되어야 사용자가 어디서든 받을 수 있음.
 - FCM / APNs 가 발급한 token 은 OS 가 종종 회전 — 옛 token 으로 보내면 vendor 가
   `NOT_REGISTERED` (FCM) 또는 `Unregistered` (APNs) 응답. 다음 발송에서도 같은 실패 반복.
 
-`RegisterDeviceTokenUseCase` 는 *이미* 한 사용자에 여러 device token 등록을 허용. 즉 데이터
+`RegisterDeviceTokenUseCase` 는 이미 한 사용자에 여러 device token 등록을 허용. 데이터
 모델은 준비됨 — 사용 안 하던 것뿐.
 
 ## 결정
@@ -39,7 +39,7 @@ device 등록 안 한 상태).
 `DispatchDeliveryService` 가 vendor 의 `VendorPermanentException` (FCM `NOT_REGISTERED`,
 APNs `Unregistered` 등) 을 catch 하면:
 - 도메인은 `markFailed("permanent: ...")` 처리 — 5회 retry 거치지만 모두 fail
-- *추가로* PUSH 채널이면 `DeviceTokenRepository.deactivateByToken(address)` 호출 →
+- 추가로 PUSH 채널이면 `DeviceTokenRepository.deactivateByToken(address)` 호출 →
   `disabledAt` 마킹 → 다음 fan-out 에서 자동 제외
 
 비활성화 자체가 실패해도 dispatch 결과에는 영향 없음 (catch + log) — 다음 영구 실패에서 재시도.

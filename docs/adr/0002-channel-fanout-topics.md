@@ -22,7 +22,7 @@ B) **채널별 topic** — `notification.delivery.push`, `notification.delivery.
   - SMS / 알림톡 은 vendor 호출당 비용이 높고 분당 처리량 한도가 낮음 (vendor 측 throttling)
   - PUSH / EMAIL 은 비용 저렴하고 throughput 높음
   - 같은 topic 에서 처리하면 SMS 가 막혀도 PUSH consumer 가 영향 받음 (head-of-line blocking)
-- DLQ 정책도 채널별로 다름 — 알림톡은 vendor reject 가 정책상 *영구* 인 경우가 많아 즉시
+- DLQ 정책도 채널별로 다름 — 알림톡은 vendor reject 가 정책상 영구인 경우가 많아 즉시
   EXHAUSTED, 반면 SES는 일시 throttling 이 흔해 retry 가치가 큼
 - consumer-group 분리 → 채널별 lag / 처리량 / 에러율 모니터링 / 알람 분리 가능
 - partition key 는 모든 topic 공통으로 `notificationId` — 같은 알림은 순서 보존

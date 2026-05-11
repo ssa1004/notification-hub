@@ -4,7 +4,8 @@
 적용
 
 ## 배경
-알림 hub 는 한 사용자에게 *짧은 시간 안에 N개 메시지 폭주* 를 막아야 합니다. 이유는 셋:
+알림 hub 는 한 사용자에게 짧은 시간 안에 N개 메시지가 폭주하는 것을 막아야 합니다.
+이유는 셋:
 
 1. **vendor 비용** — SMS / 알림톡 은 발송당 단가가 큼. 잘못된 cron 이 만 건 보내면 즉시 손실
 2. **스팸 신고** — 사용자가 분당 5번 알림을 받으면 채널 전체를 스팸 신고. vendor 가 우리
@@ -33,8 +34,10 @@ return {current, ttl}
 
 키 형식: `notif:rl:{ChannelType}:{recipientId}`
 
-`SendNotificationService` 는 fan-out 결정 후 *각 채널마다* tryConsume 호출. 하나라도 deny 면
-`RateLimitExceededException` 으로 발송 자체 거절 (HTTP 429 + Retry-After 헤더). 부분 발송 (3채널 중 2개만 보내고 1개 차단) 은 사용자에게 *왜 어떤 채널만 안 왔는지* 가 더 큰 혼란.
+`SendNotificationService` 는 fan-out 결정 후 각 채널마다 tryConsume 호출. 하나라도 deny 면
+`RateLimitExceededException` 으로 발송 자체 거절 (HTTP 429 + Retry-After 헤더). 부분 발송
+(3채널 중 2개만 보내고 1개 차단) 은 사용자에게 어떤 채널만 안 왔는지가 더 큰 혼란이라
+all-or-nothing 으로 둠.
 
 ## 결과
 - 같은 사용자 같은 채널 분당 30개 초과는 자동 차단 (push/email)

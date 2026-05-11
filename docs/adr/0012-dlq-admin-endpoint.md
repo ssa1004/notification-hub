@@ -6,10 +6,10 @@
 ## 배경
 DeliveryAttempt 가 5회 retry 후 EXHAUSTED 가 되면 자동 처리는 끝. 그 다음:
 
-- 운영자가 EXHAUSTED 항목을 *왜 실패했는지* 보려면 DB 직접 조회 → 조작 사고 위험.
-- 일시 장애 (vendor 가 1시간 죽었다가 회복) 후 EXHAUSTED 된 알림을 *수동* 재발송할 수단 필요.
-- 영구 무의미 (이미 알림 시점이 지난 OTP 등) 인 항목은 audit 만 남기고 *다시 시도하지 않음*
-  으로 명시할 수단 필요.
+- 운영자가 EXHAUSTED 항목의 실패 사유를 보려면 DB 직접 조회 → 조작 사고 위험.
+- 일시 장애 (vendor 가 1시간 죽었다가 회복) 후 EXHAUSTED 된 알림을 수동 재발송할 수단 필요.
+- 영구 무의미 (이미 알림 시점이 지난 OTP 등) 인 항목은 audit 만 남기고 다시 시도하지 않음을
+  명시할 수단 필요.
 
 ## 결정
 3개 운영 endpoint. 모두 `/api/v1/admin/dlq` 아래 + `X-Admin-Token` 헤더 검증 (`AdminAuthFilter`).
@@ -30,7 +30,7 @@ DeliveryAttempt 가 5회 retry 후 EXHAUSTED 가 되면 자동 처리는 끝. �
   검증. `MessageDigest.isEqual` 로 timing-safe 비교.
 - `AdminContext` (ThreadLocal) 에 admin 여부 세팅. use case 가 `requireAdmin()` 으로 가드 →
   `UnauthorizedAdminException` (HTTP 401).
-- `admin.auth.token` 미설정이면 *모든* admin 요청 거절 (default-deny).
+- `admin.auth.token` 미설정이면 모든 admin 요청 거절 (default-deny).
 - 향후 Spring Security + OIDC + role 기반으로 교체 — 현재는 학습 단계 단순 가드.
 
 ### replay 시 흐름
@@ -55,7 +55,7 @@ DeliveryAttempt 가 5회 retry 후 EXHAUSTED 가 되면 자동 처리는 끝. �
   네트워크 boundary 안에서만 노출 가정.
 - (단점) `X-Admin-Token` 이 평문 — TLS 외부 접근은 무조건 HTTPS. 토큰 누출 시 권한 박탈
   방법 = 환경 변수 새 토큰으로 교체 + redeploy.
-- (단점) admin 식별이 token 단위 — *누가* discard 했는지 audit 에 남지 않음. 향후
+- (단점) admin 식별이 token 단위 — 누가 discard 했는지 audit 에 남지 않음. 향후
   Authorization header 의 JWT subject 로 actor 분리.
 
 ## 다시 검토할 시점
