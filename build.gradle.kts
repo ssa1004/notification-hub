@@ -1,7 +1,7 @@
 // 루트 빌드 — 공통 conventions. 각 모듈이 상속받는 공유 설정.
 plugins {
     java
-    id("org.springframework.boot") version "3.4.1" apply false
+    id("org.springframework.boot") version "3.4.13" apply false
     id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
@@ -26,7 +26,7 @@ subprojects {
 
     the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
         imports {
-            mavenBom("org.springframework.boot:spring-boot-dependencies:3.4.1")
+            mavenBom("org.springframework.boot:spring-boot-dependencies:3.4.13")
         }
     }
 
