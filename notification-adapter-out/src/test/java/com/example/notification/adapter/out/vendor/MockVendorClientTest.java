@@ -16,7 +16,7 @@ import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 /**
- * Mock vendor client 의 *직접 호출* 테스트 (Resilience4j retry 없이). retry 통합 테스트는
+ * Mock vendor client 의 직접 호출 테스트 (Resilience4j retry 없이). retry 통합 테스트는
  * Spring context 가 필요해서 별도.
  *
  * <p>여기선 mock 이 vendor 별 적절한 예외 종류 (5xx / 4xx / network) 를 던지는지, 그리고
