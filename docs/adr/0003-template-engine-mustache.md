@@ -5,7 +5,7 @@
 
 ## 배경
 알림 템플릿은 `{name}님 주문 {orderNo} 가 출고되었습니다` 같은 placeholder 치환이 핵심.
-복잡한 분기 (if / for) 가 거의 필요 없고, 사용자/운영자가 직접 등록하므로 *문법 단순함* 이
+복잡한 분기 (if / for) 가 거의 필요 없고, 사용자/운영자가 직접 등록하므로 문법 단순함이
 중요. 후보:
 
 | 엔진 | placeholder 문법 | 장점 | 단점 |
@@ -17,7 +17,7 @@
 
 ## 결정
 **Mustache** (`com.github.spullara.mustache.java:compiler`) 를 채택. 단, 사용자 작성 편의를
-위해 우리 도메인의 placeholder 문법은 *단일 중괄호* (`{name}`) 로 두고 렌더링 직전에 이중
+위해 우리 도메인의 placeholder 문법은 단일 중괄호 (`{name}`) 로 두고 렌더링 직전에 이중
 중괄호 (`{{name}}`) 로 변환 후 컴파일.
 
 ## 결과

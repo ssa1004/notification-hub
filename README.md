@@ -323,7 +323,7 @@ helm upgrade --install notification-hub helm/notification-hub \
 
 | 저장소 | 역할 | notification-hub 와의 관계 |
 |---|---|---|
-| `auth-service` | OAuth2 / OIDC IdP — JWT 발행 + JWK 노출 | 본 hub 의 REST API 가 검증하는 JWT 의 issuer |
+| `auth-service` | OAuth2 / OIDC IdP — JWT 발행 + JWK 노출 | 본 hub 의 REST API 가 검증할 JWT 의 issuer (검증 활성화는 이후 단계) |
 | `security-log-search` | SIEM (보안 로그 정규화 + 검색 + 알람) | 본 hub 의 vendor 호출 결과 / `alert.fired` 의 sink |
 | `resell-orderbook` | 한정판 리셀 거래소 | `order.created` 등 도메인 event 의 producer (구매자 알림) |
 | `billing-platform` | B2B SaaS 결제 / 청구 / 정산 | `payment.succeeded` 등 도메인 event 의 producer (영수증 알림) |
@@ -345,7 +345,7 @@ sequenceDiagram
 
     Domain->>Auth: 1. service-account JWT 발급
     Domain->>Hub: 2. POST /api/v1/notifications<br/>(Bearer JWT, Idempotency-Key)
-    Hub->>Auth: 3. JWK Set 으로 서명 검증
+    Note over Hub,Auth: 3. JWK Set 서명 검증 — 의도된 흐름,<br/>resource-server 의존 추가는 후속 작업
     Hub->>Hub: 4. preference / DND / rate limit / fan-out
     Hub-->>Domain: 5. 202 ACCEPTED
     Note over Hub,Vendor: Outbox relay → Kafka → channel worker
@@ -377,19 +377,5 @@ docker compose -f infrastructure/docker-compose.integration.yml up -d
 ./scripts/integration-demo.sh
 ```
 
-Cross-repo 통합은 어디까지나 *스펙 시연* 용입니다. 실제 운영에서는 각 저장소를 별도
-배포하고 Kubernetes Service / Kafka cluster 를 매개로 연결합니다.
-
----
-
-## 저장소 / push
-
-이 저장소는 GitHub `ssa1004/notification-hub` 으로 push 되어 있습니다. 새로 clone 후
-직접 push 가 필요하면 다음:
-
-```bash
-gh repo create ssa1004/notification-hub --public --source . --push --remote origin
-# 또는 이미 만들어진 repo 라면
-git remote add origin git@github.com:ssa1004/notification-hub.git
-git push -u origin main
-```
+Cross-repo 통합은 스펙 시연용입니다. 실제 운영에서는 각 저장소를 별도 배포하고
+Kubernetes Service / Kafka cluster 를 매개로 연결합니다.

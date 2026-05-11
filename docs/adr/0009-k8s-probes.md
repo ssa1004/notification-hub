@@ -14,13 +14,13 @@
   반영 못하면 LB 가 죽은 pod 로 트래픽.
 
 ## 결정
-3종 probe 를 *역할 분리* 해서 명시.
+3종 probe 를 역할 분리해서 명시.
 
 | Probe | 책임 | 무엇을 본다 |
 |---|---|---|
 | **startup** | 부팅 완료 신호. readiness/liveness 가 부팅 중인 pod 를 죽이지 못하게 차단 | `/actuator/health/readiness` (failureThreshold 40 × 3s = 약 2분) |
 | **readiness** | 트래픽 받을 준비 — 외부 의존 (Kafka/Redis) 도 체크 | `/actuator/health/readiness`. `ApplicationReadinessCoordinator` 가 5s 주기 ping → `REFUSING_TRAFFIC` 토글 |
-| **liveness** | process 자체가 살아있는가 — 외부 의존과 *무관* | `/actuator/health/liveness`. JVM deadlock / OOM 직전이면 fail |
+| **liveness** | process 자체가 살아있는가 — 외부 의존과 무관 | `/actuator/health/liveness`. JVM deadlock / OOM 직전이면 fail |
 
 `management.endpoint.health.group` 으로 그룹별 indicator 분리:
 
@@ -53,5 +53,5 @@ health:
 ## 다시 검토할 시점
 - 의존이 늘어나면 (외부 ML 모델 서버, 결제 게이트웨이 등) `ApplicationReadinessCoordinator`
   가 그 의존도 체크해야 함. 의존 종류가 5개 넘으면 Strategy pattern 으로 분리.
-- multi-cluster (active-active) 로 가면 readiness 가 단순 ping 이 아니라 *cross-cluster
-  consensus* 까지 봐야 함 — Raft/etcd 합의 상태 등.
+- multi-cluster (active-active) 로 가면 readiness 가 단순 ping 이 아니라 cross-cluster
+  consensus 까지 봐야 함 — Raft/etcd 합의 상태 등.
