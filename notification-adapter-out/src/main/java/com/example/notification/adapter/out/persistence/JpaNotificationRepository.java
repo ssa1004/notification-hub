@@ -40,9 +40,13 @@ public class JpaNotificationRepository implements NotificationRepository {
                     .map(NotificationEntity::getCreatedAt)
                     .orElse(null);
         }
-        // limit + 1 만 fetch 해서 다음 페이지 존재 여부 판단
-        List<NotificationEntity> rows = jpa.findHistory(
-                recipientId.value(), cursorTs, PageRequest.of(0, limit + 1));
+        // limit + 1 만 fetch 해서 다음 페이지 존재 여부 판단.
+        // cursor 유/무를 두 쿼리로 분기 — repository 주석 참조 (PG NULL 파라미터 타입 추론 이슈).
+        PageRequest pageReq = PageRequest.of(0, limit + 1);
+        List<NotificationEntity> rows =
+                cursorTs == null
+                        ? jpa.findHistoryFirstPage(recipientId.value(), pageReq)
+                        : jpa.findHistoryAfterCursor(recipientId.value(), cursorTs, pageReq);
         boolean hasMore = rows.size() > limit;
         List<NotificationEntity> page = hasMore ? rows.subList(0, limit) : rows;
 
