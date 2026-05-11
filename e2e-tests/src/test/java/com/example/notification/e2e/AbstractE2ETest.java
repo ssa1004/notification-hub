@@ -6,8 +6,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
@@ -33,7 +33,7 @@ public abstract class AbstractE2ETest {
             new RedisContainer(DockerImageName.parse("redis:7-alpine"));
 
     static final KafkaContainer KAFKA =
-            new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"));
+            new KafkaContainer(DockerImageName.parse("apache/kafka:3.7.0"));
 
     static {
         POSTGRES.start();

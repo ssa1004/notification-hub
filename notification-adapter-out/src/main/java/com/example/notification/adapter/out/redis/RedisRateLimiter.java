@@ -42,7 +42,7 @@ public class RedisRateLimiter implements RateLimiter {
             """;
 
     /**
-     * 여러 키 *원자* 차감. ARGV[1] = windowMs, ARGV[2..N+1] = limit_i, ARGV[N+2..2N+1] = demand_i.
+     * 여러 키 원자 차감. ARGV[1] = windowMs, ARGV[2..N+1] = limit_i, ARGV[N+2..2N+1] = demand_i.
      * 1) 모든 키의 current 를 읽어 (current+demand) > limit 가 하나라도 있으면 INCRBY 안 함.
      * 2) 가능하면 일괄 INCRBY + 첫 hit 키에만 PEXPIRE.
      * 반환: {state, current_1, ttl_1, current_2, ttl_2, ...} — state=1 이면 모두 통과,
@@ -89,9 +89,13 @@ public class RedisRateLimiter implements RateLimiter {
             return result
             """;
 
+    // Spring 의 DefaultRedisScript 는 result type 으로 raw List 를 기대 — element 타입이 Lua
+    // 반환 구조에 따라 달라지므로 generic 으로 좁히지 못한다. raw 사용은 명시적으로 suppress.
+    @SuppressWarnings("rawtypes")
     private static final DefaultRedisScript<List> SCRIPT =
             new DefaultRedisScript<>(LUA_INCR_AND_TTL, List.class);
 
+    @SuppressWarnings("rawtypes")
     private static final DefaultRedisScript<List> BATCH_SCRIPT =
             new DefaultRedisScript<>(LUA_BATCH_TRY_CONSUME, List.class);
 
