@@ -34,7 +34,7 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Compile
         run: ./gradlew --no-daemon compileJava compileTestJava
@@ -63,7 +63,7 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4
 
       - name: Run e2e Testcontainers
         run: ./gradlew --no-daemon :e2e-tests:test
@@ -118,7 +118,7 @@ jobs:
           provenance: true
 
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/notification-hub:${{ steps.meta.outputs.tag }}
           severity: HIGH,CRITICAL
