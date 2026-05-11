@@ -26,9 +26,9 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
 /**
- * OutboxRelay 의 *부분 진행 보존* 회귀 락. polling 중 interrupt / 일부 실패가 나도 그때까지
- * Kafka 발행에 성공해 PUBLISHED 마킹된 row 는 commit 직전에 반드시 flush 되어야, 다음 poll
- * 에서 같은 메시지가 재발행되지 않는다.
+ * OutboxRelay 의 부분 진행 보존 회귀 가드. polling 중 interrupt 나 일부 실패가 나도, 그때까지
+ * Kafka 발행에 성공해 PUBLISHED 마킹된 row 는 commit 직전에 반드시 flush 되어야 다음 poll 에서
+ * 같은 메시지가 재발행되지 않는다.
  *
  * <p>DB / Kafka 기동 없이 순수 단위 테스트 — repository 와 KafkaTemplate 만 모킹.
  */
@@ -74,12 +74,13 @@ class OutboxRelayTest {
     }
 
     /**
-     * 핵심 회귀 락 — batch 중간에 InterruptedException 으로 일찍 return 해도, 이미 PUBLISHED
+     * 핵심 회귀 가드 — batch 중간에 InterruptedException 으로 일찍 return 해도, 이미 PUBLISHED
      * 마킹된 row 는 try/finally 의 saveAll 로 flush 되어야 한다. 이 보장이 깨지면 트랜잭션
      * commit 시 dirty-checking 만 의존하게 되고, 흐름에 따라 다음 polling 에서 같은 메시지가
      * 다시 Kafka 로 발행된다.
      */
     @Test
+    @SuppressWarnings("unchecked") // Mockito thenReturn(varargs) + generic future
     void interrupt_되어도_그_전까지_PUBLISHED_된_row_는_flush() throws InterruptedException {
         OutboxEventEntity r1 = row(1L, "topic-ok");
         OutboxEventEntity r2 = row(2L, "topic-interrupt");
