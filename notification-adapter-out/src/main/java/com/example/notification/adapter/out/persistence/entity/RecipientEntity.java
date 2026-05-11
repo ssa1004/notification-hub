@@ -13,7 +13,7 @@ import lombok.Setter;
  * 알림 hub 가 read-only 로 보는 사용자 정보.
  *
  * <p>실제 운영에선 별도 user/auth service 의 read replica 또는 Kafka CDC 로 동기화하는 패턴.
- * 이 hub 자체는 *master 가 아님* — 등록 endpoint 도 운영자/내부 시스템 전용.
+ * 이 hub 자체는 master 가 아님 — 등록 endpoint 도 운영자/내부 시스템 전용.
  *
  * <p>채널은 {@code channels_json} 에 [{type:..., address:...}, ...] 형태로 저장.
  */

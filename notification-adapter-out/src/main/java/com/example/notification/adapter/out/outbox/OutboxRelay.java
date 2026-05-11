@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Outbox → Kafka relay. {@code outbox.relay.enabled=true} 일 때 활성. 짧은 polling 주기로 PENDING
  * row 를 가져와 Kafka 로 발행 후 PUBLISHED 마킹.
  *
- * <p>send() 의 결과를 *동기 대기* 후 markPublished — 실패 시 다음 polling 에서 재시도. CDC
+ * <p>send() 의 결과를 동기 대기 후 markPublished — 실패 시 다음 polling 에서 재시도. CDC
  * (Debezium) 를 쓰면 polling 자체가 불필요하지만 학습 목적엔 polling 이 충분.
  *
  * <p>한 번에 가져오는 row 수와 polling 주기는 application.yml 의 {@code outbox.relay.*} 로 조정.
@@ -50,7 +50,7 @@ public class OutboxRelay {
      *
      * <p>row 잠금은 {@link OutboxEventJpaRepository#findPending} 의 {@code FOR UPDATE SKIP LOCKED}
      * 가 책임 — 다른 instance 가 같은 row 를 동시에 가져가지 못한다. shutdown / interrupt 로
-     * 중단되어도 그때까지 status 변경된 row 는 *return 전에* 명시적으로 flush 해 부분 진행을
+     * 중단되어도 그때까지 status 변경된 row 는 return 전에 명시적으로 flush 해 부분 진행을
      * 보존한다 (안 그러면 dirty-checking 으로 commit 되지만 batch 끝까지 못 가서 N 회 재발행).
      */
     @Scheduled(fixedDelayString = "${outbox.relay.fixed-delay-ms:500}")

@@ -18,10 +18,10 @@ public interface RateLimiter {
     RateLimitDecision tryConsume(RecipientId recipientId, ChannelType channel);
 
     /**
-     * 여러 채널의 토큰을 *원자적으로* 시도. 한 묶음 알림이 PUSH+EMAIL 같이 다채널 fan-out 일
-     * 때, 채널별로 따로 {@link #tryConsume} 를 호출하면 channel#1 은 통과 (토큰 차감) 후
-     * channel#2 가 거절되는 케이스에서 channel#1 토큰만 부분 소진 — 사용자 입장에서는 실제 발송이
-     * 0건인데 토큰만 빠진 leak.
+     * 여러 채널의 토큰을 원자적으로 시도. 한 묶음 알림이 PUSH+EMAIL 같이 다채널 fan-out 일 때,
+     * 채널별로 따로 {@link #tryConsume} 를 호출하면 channel#1 은 통과 (토큰 차감) 후 channel#2
+     * 가 거절되는 케이스에서 channel#1 토큰만 부분 소진 — 사용자 입장에서는 실제 발송이 0건인데
+     * 토큰만 빠진 leak.
      *
      * <p>구현체는 모든 채널의 가용성을 먼저 확인 후, 전부 가능할 때만 일괄 차감해야 한다 (Redis
      * Lua 스크립트로 보장). 어느 하나라도 차단되면 모든 채널의 토큰이 그대로 유지되고 결과 맵의

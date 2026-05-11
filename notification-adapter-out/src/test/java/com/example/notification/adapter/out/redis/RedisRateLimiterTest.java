@@ -19,7 +19,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * RedisRateLimiter 의 *원자 batch 차감* 회귀 락 — Testcontainers Redis 사용. 가장 중요한 보장:
+ * RedisRateLimiter 의 원자 batch 차감 회귀 가드 — Testcontainers Redis 사용. 가장 중요한 보장:
  * 다채널 묶음에서 한 채널이라도 토큰 부족이면, 다른 채널의 토큰도 차감되지 않아야 한다.
  * 옛 per-channel tryConsume 흐름은 channel#1 은 차감 + channel#2 거절 → channel#1 token leak.
  */

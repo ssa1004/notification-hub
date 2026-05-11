@@ -69,10 +69,10 @@ public final class Template {
     }
 
     /**
-     * 치환 후 길이가 채널별 한도를 *분명히* 넘을 수 있는 경우만 사전 차단.
+     * 치환 후 길이가 채널별 한도를 분명히 넘을 수 있는 경우만 사전 차단.
      *
      * <p>SMS 한국 LMS = 2000B 이고 SMS = 90B. placeholder 가 있으면 정확한 길이를 알 수 없으므로
-     * 여기서는 *템플릿 raw 길이* 로 sanity check 만. 실제 치환 후 길이 검증은 vendor 가 함.
+     * 여기서는 템플릿 raw 길이로 sanity check 만. 실제 치환 후 길이 검증은 vendor 가 함.
      */
     private static void validateChannelLimit(ChannelType type, String body) {
         if (type == ChannelType.SMS && body.length() > 2000) {
