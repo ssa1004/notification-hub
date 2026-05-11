@@ -1,7 +1,7 @@
 package com.example.notification.domain.notification;
 
 /**
- * 알림 전체 (=묶음 단위) 의 상태. 한 알림은 여러 채널로 fan-out 되므로 *대표 상태* 입니다.
+ * 알림 전체 (=묶음 단위) 의 상태. 한 알림은 여러 채널로 fan-out 되므로 대표 상태입니다.
  *
  * <p>상태 머신:
  *

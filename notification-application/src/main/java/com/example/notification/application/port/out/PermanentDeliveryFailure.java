@@ -8,7 +8,7 @@ package com.example.notification.application.port.out;
  * 단계에선 ignore-exception, application 단계에선 즉시 markFailed + (PUSH 라면) device token
  * 비활성화로 간다.
  *
- * <p>이 마커가 *없는* RuntimeException 은 일시 오류로 간주 — Resilience4j retry 후에도
+ * <p>이 마커가 없는 RuntimeException 은 일시 오류로 간주 — Resilience4j retry 후에도
  * 실패하면 도메인 단의 retry 카운트로 흡수.
  *
  * <p><b>왜 마커 인터페이스</b>: application 모듈은 adapter-out 의 구체 예외 클래스에 의존할 수

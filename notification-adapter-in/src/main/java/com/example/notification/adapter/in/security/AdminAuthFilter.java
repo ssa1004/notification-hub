@@ -20,7 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>비교는 timing-safe ({@link MessageDigest#isEqual}). 다른 endpoint 는 그대로 통과 — Spring
  * Security 도입 전 단계의 가벼운 가드. 실제 운영은 Spring Security + OIDC + role 기반으로 교체.
  *
- * <p>{@code admin.auth.token} 미설정이면 *모든 admin 요청 거절* — 사고 방지 (default-deny).
+ * <p>{@code admin.auth.token} 미설정이면 모든 admin 요청을 거절 — 사고 방지 (default-deny).
  */
 @Slf4j
 @Component

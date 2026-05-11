@@ -47,10 +47,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 한 알림 발송. 흐름은 {@link SendNotificationUseCase} javadoc 참조.
  *
- * <p>Idempotency-Key 점유는 트랜잭션 *밖* 에서 가장 먼저 (DB 무관하게 차단). 이후 단계는 한
+ * <p>Idempotency-Key 점유는 트랜잭션 밖에서 가장 먼저 (DB 무관하게 차단). 이후 단계는 한
  * 트랜잭션 안에서 — DB write + Outbox write 가 atomic.
  *
- * <p>Rate limit 차단은 idempotency 점유 *후* — 같은 idempotencyKey 로 retry 한 호출은 rate
+ * <p>Rate limit 차단은 idempotency 점유 후 — 같은 idempotencyKey 로 retry 한 호출은 rate
  * limit 까지 다시 소진하지 않도록 (이미 점유 실패가 먼저 떠야 함).
  */
 @Slf4j

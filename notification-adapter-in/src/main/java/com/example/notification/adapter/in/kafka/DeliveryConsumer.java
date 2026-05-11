@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * <p>topic 분리 — 채널마다 partition / consumer-group / DLQ 정책 분리 가능. ADR-0002 참조.
  *
  * <p>실패 처리는 Spring Kafka 의 DefaultErrorHandler + DeadLetterPublishingRecoverer 가 담당
- * (bootstrap config 에서 등록). 여기서는 *그냥 throw* 만 하면 됨.
+ * (bootstrap config 에서 등록). 여기서는 throw 만 하면 됨.
  */
 @Slf4j
 @Component

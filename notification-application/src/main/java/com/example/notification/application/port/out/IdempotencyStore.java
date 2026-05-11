@@ -6,7 +6,7 @@ import java.time.Duration;
 /**
  * 멱등성 키 점유 store. Redis SETNX 로 구현.
  *
- * <p>같은 키가 동시에 두 번 들어오면 한 쪽만 성공해야 하므로 set-if-absent 의 *원자성* 이
+ * <p>같은 키가 동시에 두 번 들어오면 한 쪽만 성공해야 하므로 set-if-absent 의 원자성이
  * 핵심. 분산 환경에서 application 단의 Map 은 못 씀 (인스턴스마다 별도라 race).
  */
 public interface IdempotencyStore {

@@ -129,10 +129,10 @@ vendor:
     enforce-night-block: false
 
 # Resilience4j retry config — vendor 호출 단계.
-# *경계*: 여기 retry 는 한 vendor 호출 *내부* 의 단발성 5xx/IO 흡수만 책임 (max 3회 = 3 * 200~600ms).
+# 경계: 여기 retry 는 한 vendor 호출 내부의 단발성 5xx/IO 흡수만 책임 (max 3회 = 3 * 200~600ms).
 # 그 retry 가 모두 실패하면 throw → DispatchDeliveryService 가 markFailed → 도메인 측에서
 # DeliveryAttempt.retryCount++ 해서 PENDING 으로 환원 → outbox 다음 polling 에서 재발송.
-# 즉 "vendor 호출 1회의 즉시 재시도" 와 "attempt 단위 재시도" 가 *직렬* 로 동작 — 같은 호출에
+# 즉 "vendor 호출 1회의 즉시 재시도" 와 "attempt 단위 재시도" 가 직렬로 동작 — 같은 호출에
 # 대해 중복으로 polling + retry 가 돌지 않음.
 #
 # 키 (fcm/ses/twilio/kakao) 는 vendor 별 SLA 가 다른 경우 wait-duration / multiplier 만 별도

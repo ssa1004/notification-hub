@@ -145,8 +145,8 @@ class SendNotificationServiceTest {
     }
 
     /**
-     * 핵심 회귀 락 — 다채널 fan-out 에서 한 채널이라도 토큰 부족이면 *나머지 채널 토큰도 차감
-     * 안 됨*. 채널별로 따로 호출하던 옛 코드는 channel#1 만 차감되고 throw 되어 leak.
+     * 핵심 회귀 가드 — 다채널 fan-out 에서 한 채널이라도 토큰 부족이면 나머지 채널의 토큰도
+     * 차감되지 않아야 한다. 채널별로 따로 호출하던 옛 코드는 channel#1 만 차감되고 throw 되어 leak.
      */
     @Test
     void 다채널_차단_시_모든_채널_토큰_보존() {

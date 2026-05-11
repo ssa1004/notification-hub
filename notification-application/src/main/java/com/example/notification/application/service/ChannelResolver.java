@@ -13,7 +13,7 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
- * 한 알림의 *대상 채널* 을 최종 결정하는 도메인 서비스. 입력:
+ * 한 알림의 대상 채널을 최종 결정하는 도메인 서비스. 입력:
  *
  * <ul>
  *   <li>Recipient — 사용자가 가진 raw 채널들 (이메일, 전화번호, push token)
