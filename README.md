@@ -1,5 +1,11 @@
 # Notification Hub
 
+[![CI](https://github.com/ssa1004/notification-hub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ssa1004/notification-hub/actions/workflows/ci.yml)
+[![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.x-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Gradle](https://img.shields.io/badge/Gradle-8.10-02303A?logo=gradle&logoColor=white)](https://gradle.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 다채널 알림 발송 hub 입니다. 한 알림 요청을 사용자의 채널 선호도와 발송자 정책에 따라
 push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ / rate limit / template /
 방해금지 시간 (DND, Do Not Disturb) / opt-out / 전송 추적까지 묶음 처리합니다.
