@@ -10,7 +10,7 @@ SIGTERM 을 즉시 SIGKILL 로 바꿔버리면:
   끊기면 idempotency 키만 점유된 채 알림 실종.
 - **Outbox row 가 PUBLISHED 마킹 직전에 끊김** — outbox row 는 다음 polling 에서 재발행되어
   최종적으로 멱등 처리 가능 (consumer 측 dedupe 가 있다면). 다만 PUBLISHED 마킹과 Kafka send
-  사이에 끊기면 *중복 발행* 가능 — at-least-once 의 본질.
+  사이에 끊기면 중복 발행 가능 — at-least-once 의 본질.
 - **Kafka consumer offset commit 직전에 끊김** — 같은 메시지를 다시 처리. consumer 측 멱등성
   필요.
 
@@ -37,7 +37,7 @@ lifecycle:
 ```
 - 5초 sleep — kube-proxy 의 iptables update + LB endpoint sync 가 SIGTERM 보다 늦게
   도착하는 race 회피. 이 5초 동안 service endpoint 에서 pod 가 빠지면서, 신규 트래픽이
-  *다른* pod 로 라우팅됨.
+  다른 pod 로 라우팅됨.
 
 ### 3. K8s grace period
 ```yaml

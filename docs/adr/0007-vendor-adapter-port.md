@@ -32,7 +32,7 @@ public interface DeliveryGateway {
 `Map<ChannelType, DeliveryGateway>` 로 indexing. 같은 channelType 의 gateway 가 두 개면 즉시
 `IllegalStateException` 으로 fail-fast (config drift 방지).
 
-vendor 호출의 retry / circuit breaker 는 *adapter 단의* `@Retry(name="vendorFcm")` 로 처리 —
+vendor 호출의 retry / circuit breaker 는 adapter 단의 `@Retry(name="vendorFcm")` 로 처리 —
 도메인이 알 필요 없음. config 는 `application.yml` 의 `resilience4j.retry.instances` 에 vendor
 별 분리.
 
@@ -43,12 +43,12 @@ vendor 호출의 retry / circuit breaker 는 *adapter 단의* `@Retry(name="vend
 - vendor 호출 단위 테스트는 SDK mock + Gateway interface 만으로 가능
 - (현재 상태) 학습 목적이라 vendor SDK 추가 X — Mock 4종으로 대체. 실제 채택 시엔 SDK 가 한
   vendor 당 5~50MB 추가됨
-- (단점) vendor 의 *비동기 콜백* (vendor → 우리 webhook) 은 별도 `AcknowledgeDeliveryUseCase`
+- (단점) vendor 의 비동기 콜백 (vendor → 우리 webhook) 은 별도 `AcknowledgeDeliveryUseCase`
   로 처리 — DeliveryGateway 추상은 동기 호출만 책임. 콜백 형식이 vendor 별로 매우 다르므로
   adapter-in 의 controller 가 vendor 별 분리
 
 ## 다시 검토할 시점
 - 동일 채널 내 vendor 다중화 (PUSH 를 FCM + APNs 동시 / 자체 push) 가 필요하면 라우팅 로직을
-  enum 키 외 *전략 객체* 로 확장 (예: device 의 OS 보고 결정)
+  enum 키 외 전략 객체로 확장 (예: device 의 OS 보고 결정)
 - 비동기 호출 중심 (vendor 에 비동기 send + 응답 callback) 으로 가야 하면 dispatch 시그니처를
   `CompletableFuture<String>` 으로 변경
