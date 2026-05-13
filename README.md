@@ -242,6 +242,24 @@ curl -s -X POST http://localhost:8080/api/v1/templates \
 ./gradlew :notification-bootstrap:bootJar    # 배포용 jar
 ```
 
+## Load test (k6)
+
+`load/k6/` 에 5 가지 k6 부하 시나리오. 단순 RPS 측정이 아니라 다채널 fan-out 의 atomic
+rate limit, cursor 분기의 회귀 가드, webhook HMAC 의 fail-closed 동작까지 함께 검증한다.
+
+```bash
+brew install k6
+./gradlew :notification-bootstrap:bootRun   # 또는 docker-compose 통합 환경
+
+k6 run load/k6/scenarios/notify-single-channel.js   # PUSH 단일 채널 200 req/s
+k6 run load/k6/scenarios/notify-multi-channel.js    # 4 채널 fan-out 100 req/s
+k6 run load/k6/scenarios/ratelimit-saturation.js    # 단일 recipient 한도 트리거
+k6 run load/k6/scenarios/history-cursor.js          # cursor=null 회귀 가드
+k6 run load/k6/scenarios/webhook-callback.js        # HMAC 검증 500 req/s
+```
+
+상세 thresholds / 환경변수 / 알림 특유 metric 해석은 [load/README.md](load/README.md).
+
 ## 운영 프로필 (`prod`)
 
 `SPRING_PROFILES_ACTIVE=prod` 일 때 활성화되는 항목:
