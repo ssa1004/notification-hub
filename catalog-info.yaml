@@ -34,7 +34,7 @@ spec:
     - notification-rest
     - notification-hub-alerts-fired
   consumesApis:
-    - resell-orderbook-domain-events
+    - bid-ask-marketplace-domain-events
     - billing-platform-domain-events
     - gpu-job-orchestrator-domain-events
   dependsOn:
