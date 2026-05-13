@@ -353,7 +353,7 @@ helm upgrade --install notification-hub helm/notification-hub \
 | `billing-platform` | B2B SaaS 결제 / 청구 / 정산 | `payment.succeeded` 등 도메인 event 의 producer (영수증 알림) |
 | `gpu-job-orchestrator` | GPU job 관리 백엔드 | `job.completed` event producer (작업 완료 알림) |
 | `search-service` | commerce 상품 검색 백엔드 | `index.reindex.failed` 등 운영 알림 producer |
-| `mini-shop-observability` | 자체 Spring observability 모듈 + MSA 플레이그라운드 | tracing / metric 라이브러리 컨벤션 공유 |
+| `commerce-ops` | 자체 Spring observability 모듈 + MSA 플레이그라운드 | tracing / metric 라이브러리 컨벤션 공유 |
 | `notification-hub` | (본 저장소) 다채널 알림 발송 hub | 위 도메인 service 의 알림 fan-out + 운영 alert 의 sink-or-source |
 
 ### 통합 흐름
