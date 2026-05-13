@@ -349,7 +349,7 @@ helm upgrade --install notification-hub helm/notification-hub \
 |---|---|---|
 | `auth-service` | OAuth2 / OIDC IdP — JWT 발행 + JWK 노출 | 본 hub 의 REST API 가 검증할 JWT 의 issuer (검증 활성화는 이후 단계) |
 | `security-log-search` | SIEM (보안 로그 정규화 + 검색 + 알람) | 본 hub 의 vendor 호출 결과 / `alert.fired` 의 sink |
-| `resell-orderbook` | 한정판 리셀 거래소 | `order.created` 등 도메인 event 의 producer (구매자 알림) |
+| `bid-ask-marketplace` | 한정판 리셀 거래소 | `order.created` 등 도메인 event 의 producer (구매자 알림) |
 | `billing-platform` | B2B SaaS 결제 / 청구 / 정산 | `payment.succeeded` 등 도메인 event 의 producer (영수증 알림) |
 | `gpu-job-orchestrator` | GPU job 관리 백엔드 | `job.completed` event producer (작업 완료 알림) |
 | `search-service` | commerce 상품 검색 백엔드 | `index.reindex.failed` 등 운영 알림 producer |
