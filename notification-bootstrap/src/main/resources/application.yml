@@ -104,6 +104,11 @@ outbox:
     fixed-delay-ms: 500
     batch-size: 50
     send-timeout-ms: 3000
+    # 한 poll 트랜잭션의 상한 (초). findPending 의 FOR UPDATE SKIP LOCKED 가 batch row 의
+    # 행 잠금을 트랜잭션 끝까지 들고 있으므로, Kafka 지연으로 batch 가 오래 걸려도 이 시간을
+    # 넘으면 롤백 → row 는 PENDING 으로 환원되어 다음 poll 에서 재시도. 정상 경로에서는
+    # batch 처리가 이보다 훨씬 빨라 발동하지 않는다.
+    tx-timeout-seconds: 30
 
 # 사용자 × channel 별 토큰 버킷 — vendor 비용 / 사용자 폭주 방지
 ratelimit:
