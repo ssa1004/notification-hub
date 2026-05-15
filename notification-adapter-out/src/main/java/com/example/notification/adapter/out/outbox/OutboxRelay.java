@@ -43,6 +43,9 @@ public class OutboxRelay {
     @Value("${outbox.relay.send-timeout-ms:3000}")
     private long sendTimeoutMs;
 
+    // 한 poll 트랜잭션의 상한은 @Transactional(timeoutString=...) 으로 직접 property 를
+    // 읽는다 (application.yml 의 outbox.relay.tx-timeout-seconds, 기본 30s).
+
     /**
      * 짧은 주기 polling. {@code @Transactional(REQUIRES_NEW)} 로 매 호출이 별도 트랜잭션 —
      * 한 row 실패가 다른 row 의 markPublished 를 막지 않게 하려면 row 단위 commit 도 가능하나
@@ -52,9 +55,14 @@ public class OutboxRelay {
      * 가 책임 — 다른 instance 가 같은 row 를 동시에 가져가지 못한다. shutdown / interrupt 로
      * 중단되어도 그때까지 status 변경된 row 는 return 전에 명시적으로 flush 해 부분 진행을
      * 보존한다 (안 그러면 dirty-checking 으로 commit 되지만 batch 끝까지 못 가서 N 회 재발행).
+     *
+     * <p>{@code timeoutString} — Kafka 지연으로 batch 전체가 오래 걸려도 행 잠금을 무한정
+     * 들고 있지 않도록 트랜잭션 상한을 둔다. 넘으면 롤백되어 row 가 PENDING 으로 환원된다.
      */
     @Scheduled(fixedDelayString = "${outbox.relay.fixed-delay-ms:500}")
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(
+            propagation = Propagation.REQUIRES_NEW,
+            timeoutString = "${outbox.relay.tx-timeout-seconds:30}")
     public void run() {
         List<OutboxEventEntity> pending = jpa.findPending(STATUS_PENDING, PageRequest.of(0, batchSize));
         if (pending.isEmpty()) {
