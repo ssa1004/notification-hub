@@ -17,6 +17,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Slf4j
 @RestControllerAdvice
@@ -59,6 +60,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleBadRequest(
             Exception ex, HttpServletRequest req) {
         return error(HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage(), req);
+    }
+
+    /**
+     * 잘못된 형식의 query / path 파라미터 — 예: {@code /me?cursor=<garbage>} 처럼 UUID 자리에
+     * UUID 가 아닌 값. Spring 의 타입 변환 실패라 위 handler 의 예외 목록에 안 잡혀 기본적으로
+     * {@code handleUnexpected} 의 500 으로 떨어졌다. 호출자 입력 오류이므로 400 으로 명시 처리.
+     * 원본 메시지에 내부 클래스명이 섞이므로 파라미터명만 노출한다.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "BAD_REQUEST",
+                "invalid value for parameter '" + ex.getName() + "'",
+                req);
     }
 
     @ExceptionHandler(UnauthorizedAdminException.class)
