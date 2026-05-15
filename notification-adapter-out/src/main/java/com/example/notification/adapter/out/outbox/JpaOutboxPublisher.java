@@ -30,7 +30,7 @@ public class JpaOutboxPublisher implements OutboxPublisher {
         OutboxEventEntity row = new OutboxEventEntity();
         row.setTopic(topic);
         row.setKeyValue(key);
-        row.setEventId(event.eventId());
+        row.setEventId(event.getEventId());
         row.setEventType(event.getClass().getSimpleName());
         row.setPayloadJson(serialize(event));
         row.setStatus(STATUS_PENDING);
