@@ -79,7 +79,7 @@ JWT 검증 자체가 없으므로 가짜 토큰, 만료 토큰, signature 변조
 2. `SecurityFilterChain` 으로 path 별 권한:
    - `/api/v1/notifications/**`, `/api/v1/users/**`, `/api/v1/devices` → `authenticated()`
    - `/api/v1/admin/**` → `hasRole('ADMIN')` (token 가드는 fallback 으로 유지)
-   - `/api/v1/deliveries/*/ack`, `/webhooks/**` → `permitAll()` (HMAC 가 인증)
+   - `/api/v1/deliveries/*/ack` → `permitAll()` (HMAC 가 인증)
    - `/actuator/{health,info,prometheus}` → `permitAll()` (NetworkPolicy 로 IP 제한)
 3. token revocation / introspection 활성 (auth-service 가 노출)
 
@@ -279,7 +279,8 @@ $ grep -RIn -E '(HttpURLConnection|RestTemplate|WebClient|new URL|URI\.create|Ht
   - `/api/v1/admin/dlq/**`
 - Springdoc OpenAPI → `/swagger`.
 - Backstage catalog 항목 `notification-rest` 에 OpenAPI snippet 게시 (`catalog-info.yaml`).
-- Helm Ingress path 3분리: `/api/v1/notifications/*`, `/api/v1/admin/*`, `/webhooks/*`.
+- Helm Ingress path 3분리: `/api/v1/notifications/*`, `/api/v1/admin/*`, `/api/v1/deliveries/*`
+  (controller `@RequestMapping` 과 1:1 — ingress rewrite 없음).
 
 **deprecated 경로**
 

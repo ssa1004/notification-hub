@@ -2,8 +2,8 @@
 //
 // 시나리오 의도:
 //   - vendor (FCM/SES/Twilio/Kakao) 의 콜백을 모사 — `POST /api/v1/deliveries/{id}/ack`
-//     (Helm ingress 에서는 `/webhooks/*` prefix 로 노출되는 path). HMAC-SHA256 서명 + 5분
-//     replay window 검증을 통과한 콜백만 200, 그 외는 401.
+//     (Helm ingress 도 같은 `/api/v1/deliveries/*` prefix 로 노출 — rewrite 없음).
+//     HMAC-SHA256 서명 + 5분 replay window 검증을 통과한 콜백만 200, 그 외는 401.
 //   - HMAC 계산 + 5분 윈도우 정상 path 의 throughput 을 보고, 의도적으로 잘못된 서명을
 //     섞어 (k6 의 매 N 번째 iteration) fail-closed 가 깨지지 않는지도 동시에 확인.
 //

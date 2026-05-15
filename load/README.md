@@ -151,7 +151,8 @@ k6 run load/k6/scenarios/history-cursor.js
 ### 5) webhook-callback — vendor ack HMAC 검증
 
 vendor (FCM/SES/Twilio/Kakao) 의 콜백 모사 — `POST /api/v1/deliveries/{id}/ack` (Helm
-ingress 에서 `/webhooks/*` prefix 로 노출). 한 시나리오 안에 세 경로를 섞어 흘린다:
+ingress 도 같은 `/api/v1/deliveries/*` prefix 로 노출 — rewrite 없음). 한 시나리오 안에 세
+경로를 섞어 흘린다:
 
 - **80% 정상 서명** — 검증 통과 path 의 latency 측정. ATTEMPT_NOT_FOUND (404) 응답이 와도
   검증 단계는 통과한 신호로 간주.
