@@ -1,12 +1,19 @@
 package com.example.notification.adapter.in.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.notification.adapter.in.exception.GlobalExceptionHandler;
+import com.example.notification.application.dto.DeliveryHistoryPage;
 import com.example.notification.application.dto.SendNotificationResult;
 import com.example.notification.application.exception.DuplicateRequestException;
 import com.example.notification.application.exception.RateLimitExceededException;
@@ -87,5 +94,32 @@ class NotificationControllerTest {
                         .content(VALID_BODY))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string("Retry-After", "30"));
+    }
+
+    @Test
+    void me_with_garbage_cursor_returns_400_not_500() throws Exception {
+        // UUID 자리에 UUID 가 아닌 값 → MethodArgumentTypeMismatchException.
+        // 호출자 입력 오류이므로 400 이어야 하고, use case 까지 닿으면 안 된다.
+        mvc.perform(get("/api/v1/notifications/me")
+                        .param("recipientId", "u-1")
+                        .param("cursor", "not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+
+        verify(listUseCase, never()).list(any(), any(), anyInt());
+    }
+
+    @Test
+    void me_with_valid_cursor_reaches_use_case() throws Exception {
+        UUID cursor = UUID.randomUUID();
+        when(listUseCase.list(any(), any(), anyInt()))
+                .thenReturn(new DeliveryHistoryPage(List.of(), null));
+
+        mvc.perform(get("/api/v1/notifications/me")
+                        .param("recipientId", "u-1")
+                        .param("cursor", cursor.toString()))
+                .andExpect(status().isOk());
+
+        verify(listUseCase).list(eq("u-1"), eq(cursor), eq(20));
     }
 }
