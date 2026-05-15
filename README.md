@@ -307,7 +307,8 @@ helm/notification-hub/
   KMS / Vault / ExternalSecrets operator 가 미리 만든 Secret 을 `existingSecretName` 으로 참조.
   prod 는 무조건 external.
 - **Ingress path 3 분리** — `/api/v1/notifications/*` (호출 서비스), `/api/v1/admin/*` (운영자
-  토큰 보호), `/webhooks/*` (vendor 콜백, HMAC 서명 검증).
+  토큰 보호), `/api/v1/deliveries/*` (vendor 콜백 ack, HMAC 서명 검증). ingress 는 rewrite 없이
+  controller 의 `@RequestMapping` 경로를 그대로 노출한다.
 - **HPA / PDB / NetworkPolicy** — prod 만 HPA (CPU 70%, min 2 max 10) + NetworkPolicy 활성.
   PDB 는 replica ≥ 2 일 때만 의미 있어 자동 skip 분기.
 

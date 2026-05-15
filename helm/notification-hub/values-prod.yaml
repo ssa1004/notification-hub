@@ -58,7 +58,7 @@ ingress:
           pathType: Prefix
         - path: /api/v1/admin
           pathType: Prefix
-        - path: /webhooks
+        - path: /api/v1/deliveries
           pathType: Prefix
   tls:
     - secretName: notification-hub-tls

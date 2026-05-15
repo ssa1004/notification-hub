@@ -218,10 +218,10 @@ vendor:
 
 # ---------------------------------------------------------------------------
 # Ingress
-#   path 3종 분리:
+#   path 3종 분리 — controller 의 실제 @RequestMapping 과 1:1 (ingress 는 rewrite 안 함):
 #     /api/v1/notifications/*  — 발송 / 조회 (호출 서비스)
 #     /api/v1/admin/*          — 운영 (DLQ replay, template CRUD 등) — 토큰 보호
-#     /webhooks/*              — vendor 콜백 (HMAC 서명 검증)
+#     /api/v1/deliveries/*     — vendor 콜백 ack (HMAC 서명 검증, DeliveryAcknowledgeController)
 # ---------------------------------------------------------------------------
 ingress:
   enabled: false
@@ -235,7 +235,7 @@ ingress:
           pathType: Prefix
         - path: /api/v1/admin
           pathType: Prefix
-        - path: /webhooks
+        - path: /api/v1/deliveries
           pathType: Prefix
   tls: []
   # 예) tls:
