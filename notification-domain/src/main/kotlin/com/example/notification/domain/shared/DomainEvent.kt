@@ -10,8 +10,8 @@ import java.time.Instant
 interface DomainEvent {
 
     /** 이벤트의 전역 고유 id. consumer 측 dedup 키로 사용됩니다. */
-    fun eventId(): String
+    val eventId: String
 
     /** 이벤트 발생 시각. */
-    fun occurredAt(): Instant
+    val occurredAt: Instant
 }
