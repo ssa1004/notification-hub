@@ -1,0 +1,50 @@
+name: CodeQL
+
+# Java SAST (정적 분석). CI 와 동일하게 현재 단계에서는 자동 trigger 를 잠시 OFF 하고
+# 수동 trigger + 주간 스케줄만 둔다. push / PR trigger 복원 시 아래 블록 주석 해제.
+on:
+  workflow_dispatch:
+  schedule:
+    # 매주 월요일 03:00 UTC — dependabot 점검과 별개로 코드 자체 취약점도 주기 스캔.
+    - cron: "0 3 * * 1"
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          # security-extended — 기본 query 셋에 추가 보안 query 포함.
+          queries: security-extended
+
+      # autobuild 대신 명시 빌드 — 멀티모듈이라 CodeQL 이 전 모듈을 확실히 컴파일하도록.
+      - name: Compile
+        run: ./gradlew --no-daemon compileJava compileTestJava
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"
