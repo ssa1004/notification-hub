@@ -19,6 +19,7 @@
 - [ADR-0012 DLQ 운영 endpoint — list / replay / discard](0012-dlq-admin-endpoint.md)
 - [ADR-0013 Multi-device push fan-out + 영구 실패 자동 비활성화](0013-multi-device-push-fanout.md)
 - [ADR-0014 HMAC 기반 webhook 콜백 서명 검증](0014-hmac-webhook-callback-verification.md)
+- [ADR-0015 DLQ 운영 API 확장 — filter / detail / stats / bulk](0015-dlq-admin-api-v2.md)
 
 ## 작성 양식
 
