@@ -72,6 +72,7 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
 | [0012](docs/adr/0012-dlq-admin-endpoint.md) | DLQ 운영 endpoint — list / replay / discard |
 | [0013](docs/adr/0013-multi-device-push-fanout.md) | Multi-device push fan-out + 영구 실패 자동 비활성화 |
 | [0014](docs/adr/0014-hmac-webhook-callback-verification.md) | HMAC-SHA256 webhook 콜백 서명 검증 |
+| [0015](docs/adr/0015-dlq-admin-api-v2.md) | DLQ 운영 API 확장 — filter / detail / stats / bulk |
 
 ## 발송 흐름
 
@@ -270,6 +271,95 @@ k6 run load/k6/scenarios/webhook-callback.js        # HMAC 검증 500 req/s
 - Outbox Relay (DB outbox 테이블에서 메시지를 읽어 Kafka 로 보내는 워커) 활성화
 - Resilience4j retry (vendor 호출 단계 3회 재시도)
 - Rate limit (Redis 기반 token bucket) 활성화
+
+## DLQ 운영 콘솔 (admin REST API)
+
+`X-Admin-Token` 헤더 + `admin.auth.token` 환경 변수 (Secret) 가 일치해야 호출 가능. 모든
+endpoint 는 IP × scope 별 token bucket (기본 분당 60) — 초과 시 429 + `Retry-After`. 자세한 의도는
+[ADR 0012](docs/adr/0012-dlq-admin-endpoint.md), [ADR 0015](docs/adr/0015-dlq-admin-api-v2.md).
+
+### 단건 — list / detail / replay / discard (ADR-0012)
+
+```bash
+TOKEN="$ADMIN_AUTH_TOKEN"
+
+# EXHAUSTED 첫 페이지 (cursor pagination, id ASC)
+curl -s -H "X-Admin-Token: $TOKEN" \
+  "http://localhost:8080/api/v1/admin/dlq?limit=50"
+
+# 단건 detail — rendered title / body + retry context + errorClass
+curl -s -H "X-Admin-Token: $TOKEN" \
+  "http://localhost:8080/api/v1/admin/dlq/$ATTEMPT_ID"
+
+# 재발송 — PENDING(retry=0) 환원 + Outbox 재발행
+curl -s -X POST -H "X-Admin-Token: $TOKEN" \
+  "http://localhost:8080/api/v1/admin/dlq/$ATTEMPT_ID/replay"
+
+# 영구 종료 (soft delete) — reason 은 audit 에 기록
+curl -s -X POST -H "X-Admin-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason":"obsolete OTP"}' \
+  "http://localhost:8080/api/v1/admin/dlq/$ATTEMPT_ID/discard"
+```
+
+### 필터 / 상세 / 통계 (ADR-0015)
+
+```bash
+# 필터 검색 — 채널 / 시간 범위 / 에러 종류 / cursor / size
+curl -s -H "X-Admin-Token: $TOKEN" \
+  "http://localhost:8080/api/v1/admin/dlq/search?channel=PUSH\
+&from=2026-05-15T00:00:00Z&to=2026-05-16T00:00:00Z\
+&errorType=Transient&size=100"
+
+# 시간 bucket / 채널 / 에러 종류별 count (기본 최근 24h / 1h bucket)
+curl -s -H "X-Admin-Token: $TOKEN" \
+  "http://localhost:8080/api/v1/admin/dlq/stats?bucket=PT1H"
+```
+
+### bulk — dry-run 기본 (ADR-0015)
+
+```bash
+# 1단계: dry-run (confirm 생략 또는 false) — 대상 개수 + sample id 10개만 반환
+curl -s -X POST -H "X-Admin-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channel":"PUSH","from":"2026-05-15T00:00:00Z","to":"2026-05-15T01:00:00Z"}' \
+  "http://localhost:8080/api/v1/admin/dlq/bulk-replay"
+# → { "mode":"DRY_RUN", "estimatedCount":42, "sampleAttemptIds":[...], "jobId":null }
+
+# 2단계: sample 확인 후 confirm=true 로 재호출 — 비동기 job 시작
+curl -s -X POST -H "X-Admin-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channel":"PUSH","from":"2026-05-15T00:00:00Z","to":"2026-05-15T01:00:00Z",
+       "confirm":true,"reason":"vendor 1h outage recovery"}' \
+  "http://localhost:8080/api/v1/admin/dlq/bulk-replay"
+# → { "mode":"EXECUTING", "jobId":"...", "estimatedCount":42 }
+
+# 3단계: job 진행도 폴링
+curl -s -H "X-Admin-Token: $TOKEN" \
+  "http://localhost:8080/api/v1/admin/dlq/bulk-jobs/$JOB_ID"
+# → { "state":"RUNNING|SUCCEEDED|PARTIAL_FAILURE|FAILED",
+#     "processedCount":N, "successCount":N, "failureCount":N, "firstError":null }
+
+# bulk-discard 는 reason 필수 (NotBlank), 그 외 패턴 동일
+curl -s -X POST -H "X-Admin-Token: $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channel":"SMS","to":"2026-05-15T00:00:00Z",
+       "confirm":true,"reason":"obsolete OTP messages"}' \
+  "http://localhost:8080/api/v1/admin/dlq/bulk-discard"
+```
+
+### 안전 가드 정리
+
+- **dry-run 강제** — `confirm=true` 미명시면 무조건 dry-run. 한 번의 잘못된 호출이 수천 건을
+  재발송하지 못하게.
+- **idempotency** — 같은 `attemptId` 의 두 번째 replay 는 409 `ILLEGAL_DLQ_OPERATION` (이미
+  PENDING 으로 환원됨, EXHAUSTED 가 아님).
+- **partial failure** — bulk 한 건 실패가 다른 건 롤백 X. 각 항목 별 트랜잭션 → job 결과의
+  `failureCount` / `firstError` 로 추적.
+- **hard delete 불가** — `DELETE /api/v1/admin/dlq/{id}` 는 항상 거절 (`discard` 만 허용 — audit
+  trail 유지).
+- **audit 키** — `DLQ_REPLAY` / `DLQ_DISCARD` / `DLQ_BULK_REPLAY_DRYRUN` / `DLQ_BULK_REPLAY_START`
+  / `DLQ_BULK_REPLAY_FINISH` / `DLQ_BULK_DISCARD_*` (6종) — `audit` logger.
 
 ## Kubernetes 배포 (Helm)
 
