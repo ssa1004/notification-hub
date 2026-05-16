@@ -93,6 +93,11 @@ readiness:
 admin:
   auth:
     token: ${ADMIN_AUTH_TOKEN:}
+  # admin endpoint 호출자 IP × scope 기준 token bucket. 사람이 손으로 누르는 빈도 가정 분당 60.
+  # bulk-* 같은 무거운 작업은 controller 단에서 scope 를 다르게 잡아 동일 한도지만 별 카운터.
+  rate-limit:
+    window-ms: 60000
+    per-window: 60
 
 springdoc:
   swagger-ui:

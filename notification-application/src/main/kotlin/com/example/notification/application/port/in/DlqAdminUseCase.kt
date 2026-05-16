@@ -1,17 +1,25 @@
 package com.example.notification.application.port.`in`
 
+import com.example.notification.application.dto.DlqEntryDetail
+import com.example.notification.application.dto.DlqEntryFilter
 import com.example.notification.application.dto.DlqEntryView
+import com.example.notification.application.dto.DlqListPage
+import com.example.notification.application.dto.DlqStats
+import java.time.Duration
+import java.time.Instant
+import java.util.Optional
 import java.util.UUID
 
 /**
  * DLQ (EXHAUSTED 상태 DeliveryAttempt) 운영. 운영자만 호출.
  *
- * 3개 동작:
- * - [list] — 페이지네이션 조회 (id cursor)
- * - [replay] — EXHAUSTED 를 PENDING (retry=0) 으로 환원 + Outbox 재발행
- * - [discard] — EXHAUSTED 를 PERMANENTLY_FAILED 로 영구 종료 (audit 보존)
+ * 기존 ([list] / [replay] / [discard]) 는 호환 위해 시그니처 그대로 유지. ADR-0015 에서
+ * 필터 / 상세 / 통계 메서드 ([search] / [detail] / [stats]) 추가. bulk 작업은 별도
+ * [DlqBulkAdminUseCase] 로 분리.
  */
 interface DlqAdminUseCase {
+
+    // --- 기존 (ADR-0012). 호환성 위해 시그니처 변경 X. ---
 
     fun list(cursor: UUID?, limit: Int): List<DlqEntryView>
 
@@ -27,4 +35,25 @@ interface DlqAdminUseCase {
      * append. audit trail 만 유지.
      */
     fun discard(attemptId: UUID, reason: String?): DlqEntryView
+
+    // --- 확장 (ADR-0015). ---
+
+    /**
+     * filter 조건으로 cursor 페이지네이션. [size] 1~200 사이로 캡.
+     *
+     * 결과의 [DlqListPage.nextCursor] 가 null 이면 마지막 페이지.
+     */
+    fun search(filter: DlqEntryFilter, cursor: UUID?, size: Int): DlqListPage
+
+    /**
+     * 단건 상세 — full rendered title / body + retry context. 없으면 [Optional.empty]. 호출자는
+     * controller 단에서 404 로 매핑.
+     */
+    fun detail(attemptId: UUID): Optional<DlqEntryDetail>
+
+    /**
+     * 시간 [from]~[to] 범위의 EXHAUSTED 항목을 [bucket] 단위로 집계. [from] / [to] null 이면 각각
+     * "최근 24h 시작" / "now" 로 대체. bucket null 이면 1시간.
+     */
+    fun stats(from: Instant?, to: Instant?, bucket: Duration?): DlqStats
 }
