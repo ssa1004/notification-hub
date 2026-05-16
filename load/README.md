@@ -210,6 +210,7 @@ K6_WEBHOOK_SECRET_KAKAO=kakao-secret \
 | `K6_WEBHOOK_SECRET_SES` | `load-test-secret` | 위와 동일 — SES |
 | `K6_WEBHOOK_SECRET_TWILIO` | `load-test-secret` | 위와 동일 — Twilio |
 | `K6_WEBHOOK_SECRET_KAKAO` | `load-test-secret` | 위와 동일 — Kakao |
+| `K6_PROMETHEUS_RW_SERVER_URL` | (빈 값) | Prom remote-write target. 비면 disable. |
 
 ## k6 metric 해석 (참고)
 
@@ -281,12 +282,37 @@ webhook-callback (HMAC 80/10/10)
                               100%
 ```
 
+## 한 번에 실행
+
+```bash
+./scripts/run-load.sh
+```
+
+notify-single-channel → notify-multi-channel → ratelimit-saturation → history-cursor →
+webhook-callback 순으로 단계 실행. 각 단계 결과는 `build/k6-reports/` 에 JSON 으로
+떨군다.
+
+## Prometheus remote-write 연동 (commerce-ops 통합 대시보드)
+
+5 시나리오 결과를 `commerce-ops` 의 Prometheus 로 흘려보내 한 Grafana 대시보드에서
+client load + server actuator 를 같이 보고 싶을 때:
+
+```bash
+docker compose -f /path/to/commerce-ops/infra/docker-compose.yml up -d prometheus grafana
+
+export K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write
+./scripts/run-load.sh
+```
+
+`run-load.sh` 가 각 시나리오에 `service=notification-hub` / `scenario=<name>` tag 를
+자동 부여한다. Grafana → **Portfolio Load (k6 + actuator)** 대시보드 (uid
+`portfolio-load`) 에서 service 변수를 `notification-hub` 로 선택. 15번 패널 "notification
+rate-limit hit / channel fan-out" + actuator 의 풀 사용률 / Outbox lag / Kafka consumer
+lag 가 같은 시간축에 잡힌다. 필요 k6 버전 **0.42+** (experimental-prometheus-rw output).
+
 ## 더 나아가려면
 
-- 5 시나리오의 결과를 `build/k6-reports/*.json` 으로 떨궈서 dashboard 에 plot.
-- `--out experimental-prometheus-rw=http://prom:9090/api/v1/write` 로 Prometheus remote-write
-  연결 후 Grafana 에 plot — k6 metric 과 hub 의 actuator/prometheus metric 을 같은 시간축에
-  올리면 부하 시점의 풀 사용률 / Outbox lag / Kafka consumer lag 도 함께 본다.
+- 5 시나리오의 결과를 `build/k6-reports/*.json` 으로 떨궈서 별도 dashboard 에도 plot.
 - 더 큰 부하는 k6 cloud / k6 distributed mode 필요 — 본 시나리오는 single-node 기준이라
   VU 100 ~ 200 선 운용.
 - recipient 풀 seed 전용 스크립트 분리 — 본 hub 의 recipient/preference/device seed 는 현재
