@@ -1,5 +1,7 @@
 package com.example.notification.adapter.in.rest;
 
+import com.example.notification.application.dto.DlqBulkJob;
+import com.example.notification.application.dto.DlqBulkResult;
 import com.example.notification.application.dto.DlqEntryDetail;
 import com.example.notification.application.dto.DlqEntryFilter;
 import com.example.notification.application.dto.DlqEntryView;
@@ -8,10 +10,13 @@ import com.example.notification.application.dto.DlqStats;
 import com.example.notification.application.exception.AttemptNotFoundException;
 import com.example.notification.application.exception.RateLimitExceededException;
 import com.example.notification.application.port.in.DlqAdminUseCase;
+import com.example.notification.application.port.in.DlqBulkAdminUseCase;
 import com.example.notification.application.port.out.AdminRateLimiter;
 import com.example.notification.domain.channel.ChannelType;
 import com.example.notification.domain.shared.RateLimitDecision;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,8 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>모든 endpoint 는 호출자 IP 별 admin rate limit (분당 60). 초과 시 429 + Retry-After.
  *
- * <p>ADR-0012 (초기 단건 API) + ADR-0015 (filter / detail / stats 확장) 참조. 기존 endpoint 는
- * 호환을 위해 그대로 유지. bulk-replay / bulk-discard 는 별 PR 에서 추가 예정.
+ * <p>ADR-0012 (초기 단건 API) + ADR-0015 (filter / bulk / stats 확장) 참조. 기존 endpoint 는
+ * 호환을 위해 그대로 유지.
  */
 @RestController
 @RequestMapping("/api/v1/admin/dlq")
@@ -43,8 +48,10 @@ public class AdminDlqController {
 
     static final String RL_SCOPE_READ = "dlq.read";
     static final String RL_SCOPE_WRITE = "dlq.write";
+    static final String RL_SCOPE_BULK = "dlq.bulk";
 
     private final DlqAdminUseCase useCase;
+    private final DlqBulkAdminUseCase bulkUseCase;
     private final AdminRateLimiter adminRateLimiter;
 
     // ============================================================
@@ -141,9 +148,87 @@ public class AdminDlqController {
     }
 
     /**
+     * bulk replay. {@code confirm=true} 일 때만 실행, 그 외에는 dry-run (대상 개수 + sample id).
+     * 이는 안전 가드 — confirm 없는 호출이 곧바로 수천 건을 재발송하지 못하게 한다.
+     *
+     * <p>응답: dry-run 이면 {@code mode=DRY_RUN}, 실 실행이면 {@code mode=EXECUTING + jobId}.
+     */
+    @PostMapping("/bulk-replay")
+    public DlqBulkResult bulkReplay(
+            @Valid @RequestBody BulkRequest body, HttpServletRequest request) {
+        rateLimit(RL_SCOPE_BULK, request);
+        return bulkUseCase.bulkReplay(body.toFilter(), body.confirmedOrDefault(), body.reason());
+    }
+
+    /**
+     * bulk discard — reason 필수 (body 의 {@code reason}). dry-run 의미는 {@link #bulkReplay} 와
+     * 동일. {@code reason} 누락 시 400.
+     */
+    @PostMapping("/bulk-discard")
+    public DlqBulkResult bulkDiscard(
+            @Valid @RequestBody BulkDiscardRequest body, HttpServletRequest request) {
+        rateLimit(RL_SCOPE_BULK, request);
+        return bulkUseCase.bulkDiscard(body.toFilter(), body.confirmedOrDefault(), body.reason());
+    }
+
+    /** bulk job 진행도 / 결과 조회. */
+    @GetMapping("/bulk-jobs/{jobId}")
+    public DlqBulkJob bulkJob(
+            @PathVariable("jobId") UUID jobId, HttpServletRequest request) {
+        rateLimit(RL_SCOPE_READ, request);
+        return bulkUseCase.getBulkJob(jobId)
+                .orElseThrow(() -> new AttemptNotFoundException(jobId));
+    }
+
+    /**
+     * bulk-replay / bulk-discard 의 공통 request body.
+     *
+     * <p>{@code confirm} default = false → 항상 dry-run 부터. 운영자가 명시적으로 {@code true} 줘야
+     * 실행됨 — "한 번 더 확인" 안전망.
+     */
+    public record BulkRequest(
+            ChannelType channel,
+            String topic,
+            String consumerGroup,
+            Instant from,
+            Instant to,
+            @Size(max = 256) String errorType,
+            Boolean confirm,
+            @Size(max = 256) String reason) {
+
+        public DlqEntryFilter toFilter() {
+            return new DlqEntryFilter(channel, topic, consumerGroup, from, to, errorType);
+        }
+
+        public boolean confirmedOrDefault() {
+            return Boolean.TRUE.equals(confirm);
+        }
+    }
+
+    /** discard 는 reason 필수 — 따로 record 로 NotBlank. */
+    public record BulkDiscardRequest(
+            ChannelType channel,
+            String topic,
+            String consumerGroup,
+            Instant from,
+            Instant to,
+            @Size(max = 256) String errorType,
+            Boolean confirm,
+            @NotBlank @Size(max = 256) String reason) {
+
+        public DlqEntryFilter toFilter() {
+            return new DlqEntryFilter(channel, topic, consumerGroup, from, to, errorType);
+        }
+
+        public boolean confirmedOrDefault() {
+            return Boolean.TRUE.equals(confirm);
+        }
+    }
+
+    /**
      * audit 누락 / 잘못된 호출을 막기 위해 explicit DELETE 는 노출 X — discard 가 soft-delete 역할.
      * 운영자가 hard-delete 가 필요하면 DB 직접 작업 + audit 로 명시. 이 메서드는 자리만 잡고
-     * 500 으로 응답해 호출 시 명확한 안내 메시지를 노출.
+     * 405 로 응답해 호출 시 명확한 안내.
      */
     @DeleteMapping("/{attemptId}")
     public void hardDeleteNotAllowed(
