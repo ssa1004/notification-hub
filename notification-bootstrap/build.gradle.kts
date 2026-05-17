@@ -1,6 +1,12 @@
 // Spring Boot 진입점. main + 통합 config + Flyway 마이그레이션.
+//
+// Kotlin 마이그레이션 — main / @Configuration / readiness coordinator 모두 Kotlin.
+// plugin.spring 은 @Configuration / @Component 의 open 처리, Spring Boot SpringApplication.run
+// 은 KClass 의 .java 를 받는 형태로 호출.
 plugins {
-    java
+    `java-library`
+    kotlin("jvm")
+    kotlin("plugin.spring")
     id("org.springframework.boot")
     id("io.spring.dependency-management")
 }
@@ -25,7 +31,22 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.kafka:spring-kafka")
 
+    // Spring Boot 가 Kotlin @ConfigurationProperties / data class 의 PreferredConstructor 를 호출할 때 reflect 필요.
+    runtimeOnly("org.jetbrains.kotlin:kotlin-reflect")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    // Mockito Kotlin helpers — any() / whenever / verify 의 Kotlin friendly DSL.
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
 }
 
 tasks.named("bootJar") {
