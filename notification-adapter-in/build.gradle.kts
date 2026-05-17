@@ -17,7 +17,7 @@ dependencies {
     implementation("org.springframework.kafka:spring-kafka")
 
     // OpenAPI 문서
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
 
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     // Kotlin null-safety 와 호환되는 Jackson module — Kotlin data class 의 non-null 필드를 인식해
