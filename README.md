@@ -434,7 +434,7 @@ helm upgrade --install notification-hub helm/notification-hub \
 
 ## Portfolio Set 통합
 
-이 저장소는 8개 백엔드 저장소가 한 시스템처럼 동작하도록 묶인 포트폴리오 셋의 한
+이 저장소는 10개 백엔드 저장소가 한 시스템처럼 동작하도록 묶인 포트폴리오 셋의 한
 구성 요소입니다. profile 인덱스: <https://github.com/ssa1004/ssa1004>
 
 | 저장소 | 역할 | notification-hub 와의 관계 |
@@ -445,7 +445,9 @@ helm upgrade --install notification-hub helm/notification-hub \
 | `billing-platform` | B2B SaaS 결제 / 청구 / 정산 | `payment.succeeded` 등 도메인 event 의 producer (영수증 알림) |
 | `gpu-job-orchestrator` | GPU job 관리 백엔드 | `job.completed` event producer (작업 완료 알림) |
 | `search-service` | commerce 상품 검색 백엔드 | `index.reindex.failed` 등 운영 알림 producer |
+| `realtime-feed-service` | 실시간 피드 / 활동 스트림 백엔드 | `feed.mention` 등 활동 event 의 producer (멘션 / 팔로우 알림) |
 | `commerce-ops` | 자체 Spring observability 모듈 + MSA 플레이그라운드 | tracing / metric 라이브러리 컨벤션 공유 |
+| `graphql-gateway` | 백엔드 서비스 통합 GraphQL 게이트웨이 | 클라이언트의 알림 조회 / 발송 요청을 본 hub REST 로 위임 |
 | `notification-hub` | (본 저장소) 다채널 알림 발송 hub | 위 도메인 service 의 알림 fan-out + 운영 alert 의 sink-or-source |
 
 ### 통합 흐름
@@ -476,7 +478,7 @@ sequenceDiagram
 
 ### 시연 — `docker-compose.integration.yml`
 
-전 8 레포를 같이 띄우지 않고도, stub 으로 cross-repo 흐름만 닫아 한 호스트에서 시연
+전 10 레포를 같이 띄우지 않고도, stub 으로 cross-repo 흐름만 닫아 한 호스트에서 시연
 가능한 compose 파일을 제공합니다.
 
 - `infrastructure/docker-compose.integration.yml`
