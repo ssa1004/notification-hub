@@ -71,6 +71,7 @@ PR 전 `./gradlew check` 통과가 필수입니다. 빠른 단위 테스트만 �
 
 ## 코드 스타일
 
-- Java: Google Java Format 또는 IntelliJ default
+- Kotlin (프로덕션 코드): ktlint / IntelliJ Kotlin default
+- Java (테스트 코드): Google Java Format 또는 IntelliJ default
 - 주석 / 문서는 자연스러운 한국어 (영어 직역체 지양)
-- 도메인 모델은 `final class` + 모든 필드 `private final` (불변)
+- 값 객체는 불변 (`val` 프로퍼티), 상태 변경은 aggregate root 메서드로만

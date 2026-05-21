@@ -29,11 +29,11 @@ import 하지 않으며 (jakarta.validation 만 예외 — 표준), application 
 context/tx/slf4j 외엔 직접 의존 금지. JPA/Redis/Kafka SDK 는 adapter-out 에만 등장.
 
 ## 결과
-- 도메인 단위 테스트가 vendor / DB / Redis 없이 mock 만으로 가능 (현재 30개 통과 4초)
+- 도메인 단위 테스트가 vendor / DB / Redis 없이 mock 만으로 가능 (현재 39개 통과 4초)
 - 새 vendor 추가 = adapter-out 에 `DeliveryGateway` 구현체 1개 + Resilience4j retry 만 등록.
   도메인 / application 변경 0
 - adapter-in 이 adapter-out 을 직접 참조 못하게 의도적으로 분리 — Kafka consumer 가 vendor
   호출을 직접 하지 않고 application 의 use case (DispatchDeliveryUseCase) 를 거침
 - (단점) 모듈 수가 많아 진입 비용. ADR 와 모듈별 build.gradle.kts 주석으로 보완
 - (단점) Mapper layer (Entity ↔ Domain) 가 늘어나 boilerplate. 자동 생성 (MapStruct)
-  도입은 의존 추가 부담 vs 명시성 trade-off — 일단 수기 mapper 유지
+  도입은 의존 추가 부담 vs 명시성 장단점 — 일단 수기 mapper 유지

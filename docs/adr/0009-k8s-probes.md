@@ -36,7 +36,7 @@ health:
 ```
 
 기본 `KafkaHealthIndicator` 는 readiness/liveness 양쪽에 들어가 cascade 장애를 만들 수 있어
-끄고, `ApplicationReadinessCoordinator` (Java) 가 readiness 만 따로 토글.
+끄고, 자체 `ApplicationReadinessCoordinator` 가 readiness 만 따로 토글.
 
 ## 결과
 - **부팅 race 없음** — startup 완료 전엔 readiness/liveness 모두 "PROVISIONAL" — Service

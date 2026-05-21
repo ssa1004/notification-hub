@@ -218,8 +218,8 @@ JWT 검증 자체가 없으므로 가짜 토큰, 만료 토큰, signature 변조
 **검증**
 
 ```
-$ grep -RIn -E '(HttpURLConnection|RestTemplate|WebClient|new URL|URI\.create|HttpClient)' \
-    --include='*.java' notification-*/src/main
+$ grep -RIn -E '(HttpURLConnection|RestTemplate|WebClient|URL\(|URI\.create|HttpClient)' \
+    --include='*.kt' notification-*/src/main
 (매치 없음)
 ```
 
@@ -293,7 +293,7 @@ $ grep -RIn -E '(HttpURLConnection|RestTemplate|WebClient|new URL|URI\.create|Ht
 
 ---
 
-## API10 — Unsafe Consumption of APIs ⭐
+## API10 — Unsafe Consumption of APIs
 
 **대상**
 
@@ -324,7 +324,7 @@ $ grep -RIn -E '(HttpURLConnection|RestTemplate|WebClient|new URL|URI\.create|Ht
 `DataIntegrityViolationException` → 500 → `GlobalExceptionHandler#handleUnexpected` 로
 떨어지면서 attempt 가 final 상태로 마킹되지 못한 채 retry / EXHAUSTED 가 어긋났다.
 
-- DTO: `notification-adapter-in/src/main/java/com/example/notification/adapter/in/rest/dto/AcknowledgeDeliveryRequest.java`
+- DTO: `notification-adapter-in/src/main/kotlin/com/example/notification/adapter/in/rest/dto/AcknowledgeDeliveryRequest.kt`
 - DB 컬럼:
   - `delivery_attempt.vendor_message_id VARCHAR(128)` (Flyway V1)
   - `delivery_attempt.failure_reason VARCHAR(512)`
@@ -362,7 +362,7 @@ unbounded `String` 을 받으므로 도메인 단에서도 길이 제약을 두�
 
 | 항목 | 변경 | 위치 |
 |---|---|---|
-| API10 vendor 응답 길이 가드 | `AcknowledgeDeliveryRequest` 에 `@Size(max=128/512)` 추가 | `notification-adapter-in/.../AcknowledgeDeliveryRequest.java` |
+| API10 vendor 응답 길이 가드 | `AcknowledgeDeliveryRequest` 에 `@Size(max=128/512)` 추가 | `notification-adapter-in/.../AcknowledgeDeliveryRequest.kt` |
 
 나머지 항목은 fix 가 아닌 "후속 작업" 으로 본 문서에 명문화 — 운영 전환 시 함께 처리한다.
 
