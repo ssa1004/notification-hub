@@ -15,6 +15,7 @@
 .env.local
 .claude/
 .kotlin/
+AGENTS.md
 PLAN.md
 TODO.md
 notes.md
