@@ -1,7 +1,8 @@
 # Notification Hub
 
 [![CI](https://github.com/ssa1004/notification-hub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ssa1004/notification-hub/actions/workflows/ci.yml)
-[![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![JDK](https://img.shields.io/badge/JDK-21-007396?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.x-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Gradle](https://img.shields.io/badge/Gradle-8.10-02303A?logo=gradle&logoColor=white)](https://gradle.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -17,7 +18,7 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
 
 ## 기술 스택
 
-- **Language**: Java 21 (virtual threads)
+- **Language**: Kotlin 1.9 (JDK 21 toolchain, virtual threads)
 - **Framework**: Spring Boot 3.4
 - **Database**: PostgreSQL 16, H2 (local/dev)
 - **Cache / KV**: Redis (Lettuce)
@@ -54,7 +55,7 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
 
 ## 핵심 설계 결정
 
-상세한 배경은 [docs/adr/](docs/adr/) 의 14건에 있습니다.
+상세한 배경은 [docs/adr/](docs/adr/) 의 15건에 있습니다.
 
 | ADR | 결정 |
 |---|---|
