@@ -51,7 +51,7 @@ ADR-0012 의 3개 endpoint 는 그대로 유지 (path / 응답 호환). 다음 e
 
 ### 권한 / 안전
 - 권한 — ADR-0012 의 `AdminAuthFilter` + `AdminContext` 그대로. (Spring Security 미도입 결정
-  유지 — ADR-0012 의 trade-off 그대로 적용.)
+  유지 — ADR-0012 의 장단점 그대로 적용.)
 - audit — `AuditAction` = `DLQ_REPLAY` / `DLQ_DISCARD` / `DLQ_BULK_REPLAY_DRYRUN`
   / `DLQ_BULK_REPLAY_START` / `DLQ_BULK_REPLAY_FINISH` / `DLQ_BULK_DISCARD_*` 6종.
 - rate limit — 호출자 IP × scope 별 token bucket (Redis Lua, ADR-0006 의 token bucket 패턴
@@ -94,7 +94,7 @@ ADR-0012 의 3개 endpoint 는 그대로 유지 (path / 응답 호환). 다음 e
 - (단점) **stats 의 후처리 비용** — 큰 시간 범위 + 작은 bucket 조합은 row 수 폭증. 운영
   화면에서 기본 24h / 1h 로 제한 권고. DB-side bucket 함수 도입은 Postgres 전용으로 갈 때
   재검토 (현재 H2 호환 유지가 더 큰 가치).
-- (단점) **Spring Security 미도입 그대로** — ADR-0012 의 trade-off 가 그대로 적용. multi-admin
+- (단점) **Spring Security 미도입 그대로** — ADR-0012 의 장단점이 그대로 적용. multi-admin
   / per-actor audit / role 분리는 다음 ADR 에서 처리 예정.
 
 ## 다시 검토할 시점

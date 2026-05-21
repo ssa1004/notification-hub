@@ -17,15 +17,15 @@
 ## 결정
 `DeliveryGateway` 라는 공통 out-port 인터페이스 1개:
 
-```java
-public interface DeliveryGateway {
-    ChannelType channelType();
-    String dispatch(DeliveryAttempt attempt);  // 성공 시 vendor message id 반환
+```kotlin
+interface DeliveryGateway {
+    fun channelType(): ChannelType
+    fun dispatch(attempt: DeliveryAttempt): String  // 성공 시 vendor message id 반환
 }
 ```
 
 각 vendor 별 adapter 가 구현체:
-- `MockFcmClient implements DeliveryGateway` (channelType = PUSH)
+- `MockFcmClient : DeliveryGateway` (channelType = PUSH)
 - `MockSesClient` (EMAIL), `MockTwilioClient` (SMS), `MockKakaoAlimTalkClient` (KAKAO_ALIMTALK)
 
 라우팅은 `DispatchDeliveryService` 가 생성자에서 모든 `DeliveryGateway` 구현체를 모아
@@ -37,7 +37,7 @@ vendor 호출의 retry / circuit breaker 는 adapter 단의 `@Retry(name="vendor
 별 분리.
 
 ## 결과
-- 새 vendor 추가 = adapter-out 모듈에 `@Component class FooClient implements DeliveryGateway`
+- 새 vendor 추가 = adapter-out 모듈에 `@Component class FooClient : DeliveryGateway`
   1개 + Resilience4j config 1줄 + ratelimit config 1줄. 도메인 / application 변경 0
 - vendor SDK 의존성이 adapter-out 의 한 클래스에만 격리 → version upgrade 영향 범위 작음
 - vendor 호출 단위 테스트는 SDK mock + Gateway interface 만으로 가능

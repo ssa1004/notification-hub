@@ -37,7 +37,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Compile
-        run: ./gradlew --no-daemon compileJava compileTestJava
+        run: ./gradlew --no-daemon compileKotlin compileTestKotlin compileTestJava
 
       - name: Run unit tests (domain + application + adapters)
         run: ./gradlew --no-daemon :notification-domain:test :notification-application:test :notification-adapter-out:test :notification-adapter-in:test
