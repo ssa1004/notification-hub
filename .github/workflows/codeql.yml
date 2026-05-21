@@ -41,8 +41,9 @@ jobs:
           queries: security-extended
 
       # autobuild 대신 명시 빌드 — 멀티모듈이라 CodeQL 이 전 모듈을 확실히 컴파일하도록.
+      # 프로덕션 코드는 Kotlin 이므로 compileKotlin 까지 포함해야 SAST 가 본 코드를 분석한다.
       - name: Compile
-        run: ./gradlew --no-daemon compileJava compileTestJava
+        run: ./gradlew --no-daemon compileKotlin compileTestKotlin compileJava compileTestJava
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
