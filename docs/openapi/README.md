@@ -30,4 +30,4 @@ commit 하거나 아티팩트로 업로드한다.
 
 - Swagger UI — 앱 실행 후 `http://localhost:8080/swagger`
 - Redoc — `npx @redocly/cli preview-docs docs/openapi/notification-hub.yaml`
-- 통합 뷰어 — profile repo `ssa1004/ssa1004` 의 `docs/api/index.html` (10 service spec 드롭다운)
+- 통합 뷰어 — profile repo `ssa1004/ssa1004` 의 `docs/api/index.html` (11 service spec 드롭다운)
