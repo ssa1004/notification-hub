@@ -55,7 +55,10 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
 
 ## 핵심 설계 결정
 
-상세한 배경은 [docs/adr/](docs/adr/) 의 15건에 있습니다.
+상세한 배경은 [docs/adr/](docs/adr/) 의 15건에 있습니다. 백엔드 패턴을 **공부 목적**으로
+본다면 → [docs/backend-skills-index.md](docs/backend-skills-index.md): 이 레포가 시연하는
+패턴을 "코드 위치 → 왜(ADR) → 이론([dev-lab](https://github.com/ssa1004/dev-lab))" 으로 잇는
+학습 인덱스.
 
 | ADR | 결정 |
 |---|---|
@@ -171,6 +174,14 @@ graph LR
 
 ## 실행 방법
 
+> `make help` 로 전체 명령을 볼 수 있습니다. 가장 빠른 길:
+> ```bash
+> make run                       # H2 + Mock vendor 로 단독 실행 (:8080, 외부 의존 0)
+> make up                        # prod 인프라 (Postgres/Redis/Kafka/Kafka-UI)
+> make run-prod                  # 다른 셸에서 prod 프로파일로 앱 실행
+> make demo                      # cross-repo 통합 데모 한 사이클
+> ```
+
 H2 + Mock vendor 로 외부 의존성 없이 실행할 수 있습니다.
 
 ```bash
@@ -183,6 +194,11 @@ prod 모드 (Postgres + Redis + Kafka) 는 docker-compose 로:
 docker compose -f infrastructure/docker-compose.yml up -d postgres redis kafka kafka-ui
 SPRING_PROFILES_ACTIVE=prod ./gradlew :notification-bootstrap:bootRun
 ```
+
+> **Kafka listener 설계**: 호스트에서 `./gradlew :notification-bootstrap:bootRun` 으로 띄운 앱은
+> `localhost:9092` 로, 컨테이너끼리는 `kafka:29092` 로 붙습니다 (compose 의 EXTERNAL/INTERNAL 두 listener).
+> 단일 listener (`advertised: kafka:9092`) 면 호스트가 `kafka` 호스트명을 못 풀어 producer 가
+> 무한 대기/실패합니다 — Outbox relay 가 Kafka 로 발행하지 못하는 흔한 함정.
 
 ### 발송 한 사이클 (curl)
 

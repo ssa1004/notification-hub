@@ -35,8 +35,16 @@ services:
     environment:
       KAFKA_CFG_BROKER_ID: "1"
       KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      # listener 2개로 분리 — 호스트에서 ./gradlew :notification-bootstrap:bootRun 으로 띄운 앱
+      # (KAFKA_BOOTSTRAP 기본값 localhost:9092)과 컨테이너 내부 서비스(kafka:29092)가 둘 다 붙게.
+      #   EXTERNAL : 호스트 → localhost:9092
+      #   INTERNAL : 컨테이너끼리 + broker 간 통신 → kafka:29092
+      # 단일 listener(advertised: kafka:9092)면 호스트가 kafka 호스트명을 못 풀어 producer 가
+      # hang/실패한다 — Outbox relay 가 Kafka 로 발행하지 못하는 흔한 함정.
+      KAFKA_CFG_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       ALLOW_PLAINTEXT_LISTENER: "yes"
     ports: ["9092:9092"]
     healthcheck:
@@ -51,7 +59,8 @@ services:
     depends_on: [kafka]
     environment:
       KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      # 컨테이너 내부 통신이므로 INTERNAL listener 사용
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     ports: ["8081:8080"]
 
   notification-app:
@@ -66,7 +75,8 @@ services:
       DB_PASSWORD: notification
       DB_NAME: notification
       REDIS_HOST: redis
-      KAFKA_BOOTSTRAP: kafka:9092
+      # 컨테이너 내부 통신이므로 INTERNAL listener 사용 (호스트 실행 시에는 기본값 localhost:9092)
+      KAFKA_BOOTSTRAP: kafka:29092
     ports: ["8080:8080"]
     depends_on:
       postgres: { condition: service_healthy }
