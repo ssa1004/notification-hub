@@ -24,13 +24,13 @@ services:
       retries: 5
 
   zookeeper:
-    image: bitnami/zookeeper:3.9
+    image: bitnamilegacy/zookeeper:3.9
     environment:
       ALLOW_ANONYMOUS_LOGIN: "yes"
     ports: ["2181:2181"]
 
   kafka:
-    image: bitnami/kafka:3.7
+    image: bitnamilegacy/kafka:3.7
     depends_on: [zookeeper]
     environment:
       KAFKA_CFG_BROKER_ID: "1"
