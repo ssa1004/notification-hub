@@ -41,8 +41,11 @@ jobs:
 
       # autobuild 대신 명시 빌드 — 멀티모듈이라 CodeQL 이 전 모듈을 확실히 컴파일하도록.
       # 프로덕션 코드는 Kotlin 이므로 compileKotlin 까지 포함해야 SAST 가 본 코드를 분석한다.
+      # --no-build-cache --rerun-tasks --clean 으로 캐시(FROM-CACHE) 재사용을 막아
+      # CodeQL 추적기가 실제 컴파일러 실행을 관찰하도록 강제한다. 그렇지 않으면
+      # "no source code seen during build" 로 분석이 실패한다.
       - name: Compile
-        run: ./gradlew --no-daemon compileKotlin compileTestKotlin compileJava compileTestJava
+        run: ./gradlew --no-daemon --no-build-cache --rerun-tasks clean compileKotlin compileTestKotlin compileJava compileTestJava
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
