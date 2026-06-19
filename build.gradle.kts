@@ -6,7 +6,7 @@ plugins {
     // @Component / @RestControllerAdvice 의 자동 open, plugin.jpa 는 @Entity no-arg constructor 합성.
     kotlin("jvm") version "1.9.25" apply false
     kotlin("plugin.spring") version "1.9.25" apply false
-    kotlin("plugin.jpa") version "1.9.25" apply false
+    kotlin("plugin.jpa") version "2.4.0" apply false
     id("org.springframework.boot") version "3.5.15" apply false
     // 루트에도 적용한다(apply false 아님). Kover 합산 리포트가 만드는 koverExternalArtifacts
     // 구성은 루트 프로젝트에서 해석(resolve)되는데, 코드 모듈들이 버전 없이 선언한 Spring 의존성
