@@ -5,7 +5,7 @@ plugins {
     // plugin.spring 은 application / adapter-in / adapter-out 에서 @Service / @Repository /
     // @Component / @RestControllerAdvice 의 자동 open, plugin.jpa 는 @Entity no-arg constructor 합성.
     kotlin("jvm") version "1.9.25" apply false
-    kotlin("plugin.spring") version "1.9.25" apply false
+    kotlin("plugin.spring") version "2.4.0" apply false
     kotlin("plugin.jpa") version "1.9.25" apply false
     id("org.springframework.boot") version "3.5.15" apply false
     // 루트에도 적용한다(apply false 아님). Kover 합산 리포트가 만드는 koverExternalArtifacts
