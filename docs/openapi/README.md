@@ -2,6 +2,11 @@
 
 `notification-hub` 의 REST API 를 OpenAPI 3 spec 으로 build-time export 한다.
 
+> **현재 상태**: `notification-hub.yaml` 은 아직 커밋되어 있지 않다. 생성에 앱 부팅
+> (Postgres / Redis / Kafka) 이 필요하므로, 인프라가 준비된 환경 또는 CI 의 service
+> container 잡에서 아래 `generateOpenApiDocs` 를 돌려 산출물을 커밋한다. 손으로 작성하지
+> 않는다 (실제 라우팅 / 스키마와 어긋날 수 있으므로).
+
 ## 무엇이 들어가나
 
 - `notification-hub.yaml` — 빌드 시 생성되는 OpenAPI 3 문서. 외부 참조 / SDK codegen 의 단일 진실값.
