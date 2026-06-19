@@ -25,6 +25,10 @@ RUN ./gradlew --no-daemon :notification-bootstrap:bootJar -x test
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+# 보안: OS 패키지 패치 — Alpine libcrypto3/libssl3(openssl) 등 fixable CVE 를
+# 이미지 빌드 시점에 끌어온다. 태그 핀만으로는 패치가 안 붙으므로 명시적 upgrade.
+RUN apk upgrade --no-cache
+
 # 보안: non-root user
 RUN addgroup -S app && adduser -S app -G app
 USER app
