@@ -7,7 +7,7 @@ plugins {
     kotlin("jvm") version "1.9.25" apply false
     kotlin("plugin.spring") version "1.9.25" apply false
     kotlin("plugin.jpa") version "1.9.25" apply false
-    id("org.springframework.boot") version "3.4.13" apply false
+    id("org.springframework.boot") version "3.5.15" apply false
     // 루트에도 적용한다(apply false 아님). Kover 합산 리포트가 만드는 koverExternalArtifacts
     // 구성은 루트 프로젝트에서 해석(resolve)되는데, 코드 모듈들이 버전 없이 선언한 Spring 의존성
     // (예: org.springframework:spring-tx)의 버전은 spring-boot BOM 이 공급한다. 루트에 BOM 이
@@ -34,7 +34,7 @@ allprojects {
 // 루트에도 import 한다. (subprojects 블록은 서브프로젝트에만 적용되므로 루트에는 별도 필요)
 the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:3.4.13")
+        mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.15")
     }
 }
 
@@ -50,7 +50,7 @@ subprojects {
 
     the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
         imports {
-            mavenBom("org.springframework.boot:spring-boot-dependencies:3.4.13")
+            mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.15")
         }
     }
 
