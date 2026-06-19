@@ -1,11 +1,49 @@
 # Notification Hub
 
 [![CI](https://github.com/ssa1004/notification-hub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ssa1004/notification-hub/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ssa1004/notification-hub/branch/main/graph/badge.svg)](https://codecov.io/gh/ssa1004/notification-hub)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![JDK](https://img.shields.io/badge/JDK-21-007396?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.x-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Gradle](https://img.shields.io/badge/Gradle-8.10-02303A?logo=gradle&logoColor=white)](https://gradle.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> **English summary** — Korean docs follow below.
+
+## Overview (EN)
+
+**Notification Hub** is a multi-channel notification dispatch service. A single notify request is
+fanned out — per the recipient's channel preferences and the sender's policy — across **push /
+email / SMS / KakaoTalk AlimTalk**, bundling **idempotency, retry, DLQ, rate limiting, templating,
+Do-Not-Disturb (quiet hours), opt-out, and delivery tracking** into one flow.
+
+```
+1 request ──▶ fan-out to N channels ──▶ per-channel worker ──▶ vendor call
+               (Outbox + Kafka)          (Resilience4j retry)   (FCM / SES / Twilio / Kakao)
+```
+
+**Stack** — Kotlin 1.9 on JDK 21 (virtual threads) · Spring Boot 3.4 · PostgreSQL 16 / H2 ·
+Redis (Lettuce) · Apache Kafka (per-channel topics, Outbox pattern) · Resilience4j · Mustache ·
+Gradle 8 · Docker / Kubernetes (Helm) · Testcontainers.
+
+**Architecture** — hexagonal, 6 Gradle modules: `domain → application ← adapter-in / adapter-out`,
+wired by `bootstrap` (see the [module diagram](docs/diagrams/module-structure.svg) and
+[delivery-flow diagram](docs/diagrams/delivery-flow.svg)). 15 ADRs in [docs/adr/](docs/adr/) record
+the key decisions; [docs/backend-skills-index.md](docs/backend-skills-index.md) maps each pattern to
+its code location, ADR, and theory.
+
+**Language status (honest)** — **production code is 100% Kotlin** (no `.java` under any `src/main`).
+The **test suite is mixed and migration is in progress**: the `bootstrap` context tests and the
+Testcontainers `e2e-tests` are already Kotlin, while the **domain / application / adapter unit tests
+(22 files) are still JUnit 5 in Java**. They run unchanged on the JVM and gate CI; porting them to
+Kotlin is tracked under [향후 개선 사항](#향후-개선-사항). The badges above pin Kotlin/JDK/Spring
+versions, not test-suite language.
+
+**Run it** — `make run` boots the app on `:8080` with H2 + mock vendors and **zero external
+dependencies**. See [실행 방법](#실행-방법) for the prod profile (Postgres / Redis / Kafka) and the
+curl walkthrough.
+
+---
 
 다채널 알림 발송 hub 입니다. 한 알림 요청을 사용자의 채널 선호도와 발송자 정책에 따라
 push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ / rate limit / template /
@@ -130,6 +168,8 @@ sequenceDiagram
     end
 ```
 
+> Mermaid 를 지원하지 않는 뷰어용 정적 사본: [docs/diagrams/delivery-flow.svg](docs/diagrams/delivery-flow.svg)
+
 ## 모듈 구조
 
 ```mermaid
@@ -146,6 +186,8 @@ graph LR
     out --> app
     app --> domain
 ```
+
+> Mermaid 를 지원하지 않는 뷰어용 정적 사본: [docs/diagrams/module-structure.svg](docs/diagrams/module-structure.svg)
 
 도메인 sub-package:
 
@@ -439,6 +481,8 @@ helm upgrade --install notification-hub helm/notification-hub \
 
 ## 향후 개선 사항
 
+- 테스트 Kotlin 마이그레이션 완료 — 프로덕션 코드는 100% Kotlin 이나 도메인 / application /
+  adapter 단위 테스트 22개는 아직 Java (JUnit 5). bootstrap / e2e 테스트는 Kotlin 으로 완료.
 - vendor adapter 실 SDK 화 — 학습 단계의 Mock 4종을 실제 SDK 로 교체
 - DND 정책 확장 — 평일/주말 분리, 휴일 캘린더 연동
 - A/B 테스트 — 같은 templateKey 의 여러 본문을 트래픽 분기로 발송 + 도착률 비교
