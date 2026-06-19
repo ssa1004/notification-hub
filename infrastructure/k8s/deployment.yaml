@@ -36,7 +36,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: notification-hub
-          image: ghcr.io/your-org/notification-hub:0.1.0
+          image: ghcr.io/ssa1004/notification-hub:0.1.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
