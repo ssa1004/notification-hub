@@ -1,16 +1,15 @@
 name: CodeQL
 
-# Java SAST (정적 분석). CI 와 동일하게 현재 단계에서는 자동 trigger 를 잠시 OFF 하고
-# 수동 trigger + 주간 스케줄만 둔다. push / PR trigger 복원 시 아래 블록 주석 해제.
+# Java/Kotlin SAST (정적 분석). push / PR 마다 + 주간 스케줄로 코드 자체 취약점을 스캔.
 on:
   workflow_dispatch:
   schedule:
     # 매주 월요일 03:00 UTC — dependabot 점검과 별개로 코드 자체 취약점도 주기 스캔.
     - cron: "0 3 * * 1"
-  # push:
-  #   branches: [main]
-  # pull_request:
-  #   branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
