@@ -43,12 +43,36 @@ jobs:
       - name: Bootstrap context test
         run: ./gradlew --no-daemon :notification-bootstrap:test
 
+      # 위 단위 테스트 결과를 모듈 합산 커버리지(Kover)로 변환. test 산출물을 재사용하므로
+      # 추가로 테스트를 다시 돌리지 않는다 (koverXmlReport 는 합산 + 리포트 생성만 담당).
+      - name: Aggregate coverage (Kover)
+        if: always()
+        run: ./gradlew --no-daemon koverXmlReport koverHtmlReport
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: '**/build/reports/tests/'
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            build/reports/kover/report.xml
+            build/reports/kover/html/**
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: build/reports/kover/report.xml
+          # 토큰 없이도 public repo 의 push/PR 에서 동작. 토큰이 있으면 secrets 로 주입.
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   integration-test:
     name: Testcontainers IT
