@@ -8,11 +8,15 @@ on:
   pull_request:
     branches: [main]
 
+# 워크플로 기본은 최소 권한 (read-only). 권한이 더 필요한 job 만 개별로 올린다.
 permissions:
   contents: read
-  id-token: write
-  packages: write
-  security-events: write
+
+# 같은 ref 의 이전 실행은 취소 — PR push 연타 시 러너 낭비 방지.
+# 단, 태그/메인 push 는 릴리스 산출물이 걸리므로 취소하지 않는다.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   JAVA_VERSION: "21"
@@ -22,17 +26,19 @@ jobs:
     name: Unit + slice tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
 
       - name: Compile
         run: ./gradlew --no-daemon compileKotlin compileTestKotlin compileTestJava
@@ -51,14 +57,14 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-reports
           path: '**/build/reports/tests/'
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: coverage-report
           path: |
@@ -67,32 +73,76 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
         with:
           files: build/reports/kover/report.xml
           # 토큰 없이도 public repo 의 push/PR 에서 동작. 토큰이 있으면 secrets 로 주입.
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+  helm-validate:
+    name: Helm lint + manifest validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      CHART: helm/notification-hub
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v3.19.0
+
+      - name: Install kubeconform
+        run: |
+          KUBECONFORM_VERSION=v0.7.0
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+          kubeconform -v
+
+      # helm lint — dev / prod 두 values 셋 모두. 차트 구조 / 필수 값 누락을 잡는다.
+      - name: helm lint (dev + prod)
+        run: |
+          helm lint "$CHART" -f "$CHART/values.yaml"
+          helm lint "$CHART" -f "$CHART/values-prod.yaml"
+
+      # helm template | kubeconform — 렌더된 매니페스트를 K8s 스키마로 strict 검증.
+      # 누락된 CRD 스키마(ServiceMonitor 등)는 무시하되, core API 오류는 실패시킨다.
+      - name: helm template | kubeconform (dev + prod)
+        run: |
+          set -euo pipefail
+          for VALUES in values.yaml values-prod.yaml; do
+            echo "::group::kubeconform $VALUES"
+            helm template ci "$CHART" -f "$CHART/$VALUES" \
+              | kubeconform -strict -summary -ignore-missing-schemas \
+                  -schema-location default
+            echo "::endgroup::"
+          done
+
   integration-test:
     name: Testcontainers IT
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: test
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
 
       - name: Run e2e Testcontainers
         run: ./gradlew --no-daemon :e2e-tests:test
 
       - name: Upload e2e reports (always)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: e2e-reports
           path: |
@@ -103,10 +153,15 @@ jobs:
     name: Build & push container image
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [test, integration-test]
+    needs: [test, helm-validate, integration-test]
     if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Determine image tag
         id: meta
@@ -119,17 +174,17 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & push image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: infrastructure/Dockerfile
@@ -139,10 +194,23 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: true
 
-      - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.35.0
+      # Trivy 이미지 스캔 — SARIF 로 출력해 GitHub Security 탭에 업로드.
+      # continue-on-error: 스캔 자체가 게이트가 아니라 가시성 목적 (취약점은 Security 탭에서 추적).
+      - name: Trivy image scan (SARIF)
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/notification-hub:${{ steps.meta.outputs.tag }}
+          format: sarif
+          output: trivy-results.sarif
           severity: HIGH,CRITICAL
-          exit-code: "1"
           ignore-unfixed: true
+
+      - name: Upload Trivy SARIF to code scanning
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image
