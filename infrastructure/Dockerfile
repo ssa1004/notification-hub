@@ -25,6 +25,15 @@ RUN ./gradlew --no-daemon :notification-bootstrap:bootJar -x test
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+# OCI image labels — 레지스트리 / 스캐너 / 배포 도구가 출처를 추적할 수 있게.
+# org.opencontainers.image.* 는 OCI 표준 annotation key.
+LABEL org.opencontainers.image.title="notification-hub" \
+      org.opencontainers.image.description="다채널 알림 발송 hub (PUSH / EMAIL / SMS / KAKAO)" \
+      org.opencontainers.image.source="https://github.com/ssa1004/notification-hub" \
+      org.opencontainers.image.url="https://github.com/ssa1004/notification-hub" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="ssa1004"
+
 # 보안: OS 패키지 패치 — Alpine libcrypto3/libssl3(openssl) 등 fixable CVE 를
 # 이미지 빌드 시점에 끌어온다. 태그 핀만으로는 패치가 안 붙으므로 명시적 upgrade.
 RUN apk upgrade --no-cache
