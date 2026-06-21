@@ -43,3 +43,34 @@ updates:
       - github-actions
     commit-message:
       prefix: "chore(ci)"
+
+  # Docker — 런타임 / 빌더 베이스 이미지 (eclipse-temurin) 의 패치 태그 갱신.
+  # 베이스 이미지 CVE 가 떴을 때 dependabot 이 FROM 핀을 올려주는 PR 을 만든다.
+  - package-ecosystem: docker
+    directory: "/infrastructure"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(docker)"
+
+  # Docker — 통합 테스트용 auth-stub (nginx) 베이스 이미지.
+  - package-ecosystem: docker
+    directory: "/infrastructure/integration/auth-stub"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(docker)"
