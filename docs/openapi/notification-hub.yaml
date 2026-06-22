@@ -1,0 +1,992 @@
+openapi: 3.1.0
+info:
+  title: Notification Hub API
+  description: Multi-channel (PUSH/EMAIL/SMS/KAKAO) notification delivery service.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  version: 0.1.0
+servers:
+- url: https://api.notification-hub.example.com
+  description: Canonical base URL (placeholder)
+paths:
+  /api/v1/users/{recipientId}/preferences:
+    put:
+      tags:
+      - user-preference-controller
+      operationId: update
+      parameters:
+      - name: recipientId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserPreferenceRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PreferenceResponse"
+  /api/v1/templates:
+    post:
+      tags:
+      - template-controller
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterTemplateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TemplateResponse"
+  /api/v1/notifications:
+    post:
+      tags:
+      - notification-controller
+      operationId: send
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendNotificationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SendNotificationResponse"
+  /api/v1/devices:
+    post:
+      tags:
+      - device-token-controller
+      operationId: register_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDeviceTokenRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeviceTokenResponse"
+  /api/v1/deliveries/{deliveryAttemptId}/ack:
+    post:
+      tags:
+      - delivery-acknowledge-controller
+      operationId: acknowledge
+      parameters:
+      - name: deliveryAttemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Notification-Hub-Vendor
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: X-Notification-Hub-Signature
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: X-Notification-Hub-Timestamp
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcknowledgeDeliveryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/dlq/{attemptId}/replay:
+    post:
+      tags:
+      - admin-dlq-controller
+      operationId: replay
+      parameters:
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqEntryView"
+  /api/v1/admin/dlq/{attemptId}/discard:
+    post:
+      tags:
+      - admin-dlq-controller
+      operationId: discard
+      parameters:
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscardRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqEntryView"
+  /api/v1/admin/dlq/bulk-replay:
+    post:
+      tags:
+      - admin-dlq-controller
+      operationId: bulkReplay
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqBulkResult"
+  /api/v1/admin/dlq/bulk-discard:
+    post:
+      tags:
+      - admin-dlq-controller
+      operationId: bulkDiscard
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkDiscardRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqBulkResult"
+  /api/v1/notifications/{id}:
+    get:
+      tags:
+      - notification-controller
+      operationId: get
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: uuid
+  /api/v1/notifications/me:
+    get:
+      tags:
+      - notification-controller
+      operationId: list
+      parameters:
+      - name: recipientId
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeliveryHistoryPage"
+  /api/v1/admin/dlq:
+    get:
+      tags:
+      - admin-dlq-controller
+      operationId: list_1
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DlqEntryView"
+  /api/v1/admin/dlq/{attemptId}:
+    get:
+      tags:
+      - admin-dlq-controller
+      operationId: detail
+      parameters:
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqEntryDetail"
+    delete:
+      tags:
+      - admin-dlq-controller
+      operationId: hardDeleteNotAllowed
+      parameters:
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/dlq/stats:
+    get:
+      tags:
+      - admin-dlq-controller
+      operationId: stats
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: bucket
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqStats"
+  /api/v1/admin/dlq/search:
+    get:
+      tags:
+      - admin-dlq-controller
+      operationId: search
+      parameters:
+      - name: channel
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - PUSH
+          - EMAIL
+          - SMS
+          - KAKAO_ALIMTALK
+      - name: topic
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: consumerGroup
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: errorType
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqListPage"
+  /api/v1/admin/dlq/bulk-jobs/{jobId}:
+    get:
+      tags:
+      - admin-dlq-controller
+      operationId: bulkJob
+      parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqBulkJob"
+components:
+  schemas:
+    UpdateUserPreferenceRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - MARKETING
+          - TRANSACTIONAL
+          - SECURITY
+          - SERVICE
+        allowed:
+          type: boolean
+        preferredChannels:
+          type: array
+          items:
+            type: string
+            enum:
+            - PUSH
+            - EMAIL
+            - SMS
+            - KAKAO_ALIMTALK
+          uniqueItems: true
+        quietStart:
+          type: string
+        quietEnd:
+          type: string
+        disableQuietHours:
+          type: boolean
+        timezone:
+          type: string
+    PreferenceResponse:
+      type: object
+      properties:
+        recipientId:
+          type: string
+        quietStart:
+          type: string
+        quietEnd:
+          type: string
+        timezone:
+          type: string
+      required:
+      - recipientId
+      - timezone
+    RegisterTemplateRequest:
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 128
+          minLength: 0
+        locale:
+          type: string
+          minLength: 1
+        channelType:
+          type: string
+          enum:
+          - PUSH
+          - EMAIL
+          - SMS
+          - KAKAO_ALIMTALK
+        titleTemplate:
+          type: string
+          maxLength: 200
+          minLength: 0
+        bodyTemplate:
+          type: string
+          maxLength: 4000
+          minLength: 0
+      required:
+      - bodyTemplate
+      - channelType
+      - key
+      - locale
+      - titleTemplate
+    TemplateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        locale:
+          type: string
+        channelType:
+          type: string
+        titleTemplate:
+          type: string
+        bodyTemplate:
+          type: string
+      required:
+      - bodyTemplate
+      - channelType
+      - id
+      - key
+      - locale
+      - titleTemplate
+    SendNotificationRequest:
+      type: object
+      properties:
+        recipientId:
+          type: string
+          maxLength: 128
+          minLength: 0
+        kind:
+          type: string
+          enum:
+          - MARKETING
+          - TRANSACTIONAL
+          - SECURITY
+          - SERVICE
+        title:
+          type: string
+          maxLength: 200
+          minLength: 0
+        body:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        payload:
+          type: object
+          additionalProperties:
+            type: string
+        templateKey:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - kind
+      - recipientId
+    SendNotificationResponse:
+      type: object
+      properties:
+        notificationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - ACCEPTED
+          - FANNED_OUT
+          - COMPLETED
+          - SUPPRESSED
+        dispatchedChannels:
+          type: array
+          items:
+            type: string
+            enum:
+            - PUSH
+            - EMAIL
+            - SMS
+            - KAKAO_ALIMTALK
+        suppressionReason:
+          type: string
+      required:
+      - dispatchedChannels
+      - notificationId
+      - status
+    RegisterDeviceTokenRequest:
+      type: object
+      properties:
+        recipientId:
+          type: string
+          maxLength: 128
+          minLength: 0
+        platform:
+          type: string
+          enum:
+          - ANDROID
+          - IOS
+          - WEB
+        token:
+          type: string
+          maxLength: 256
+          minLength: 0
+      required:
+      - platform
+      - recipientId
+      - token
+    DeviceTokenResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipientId:
+          type: string
+        platform:
+          type: string
+        active:
+          type: boolean
+      required:
+      - active
+      - id
+      - platform
+      - recipientId
+    AcknowledgeDeliveryRequest:
+      type: object
+      properties:
+        success:
+          type: boolean
+        vendorMessageId:
+          type: string
+          maxLength: 128
+          minLength: 0
+        failureReason:
+          type: string
+          maxLength: 512
+          minLength: 0
+      required:
+      - success
+    DlqEntryView:
+      type: object
+      properties:
+        attemptId:
+          type: string
+          format: uuid
+        notificationId:
+          type: string
+          format: uuid
+        channelType:
+          type: string
+        channelAddressMasked:
+          type: string
+        status:
+          type: string
+        retryCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        failureReason:
+          type: string
+        renderedBodyLength:
+          type: integer
+          format: int32
+      required:
+      - attemptId
+      - channelAddressMasked
+      - channelType
+      - createdAt
+      - notificationId
+      - renderedBodyLength
+      - retryCount
+      - status
+    DiscardRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 256
+          minLength: 0
+    BulkRequest:
+      type: object
+      properties:
+        channel:
+          type: string
+          enum:
+          - PUSH
+          - EMAIL
+          - SMS
+          - KAKAO_ALIMTALK
+        topic:
+          type: string
+        consumerGroup:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        errorType:
+          type: string
+          maxLength: 256
+          minLength: 0
+        confirm:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 256
+          minLength: 0
+    DlqBulkResult:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - DRY_RUN
+          - EXECUTING
+        estimatedCount:
+          type: integer
+          format: int64
+        sampleAttemptIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        jobId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+      required:
+      - estimatedCount
+      - mode
+      - sampleAttemptIds
+    BulkDiscardRequest:
+      type: object
+      properties:
+        channel:
+          type: string
+          enum:
+          - PUSH
+          - EMAIL
+          - SMS
+          - KAKAO_ALIMTALK
+        topic:
+          type: string
+        consumerGroup:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        errorType:
+          type: string
+          maxLength: 256
+          minLength: 0
+        confirm:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 256
+          minLength: 0
+      required:
+      - reason
+    DeliveryHistoryPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        nextCursor:
+          type: string
+          format: uuid
+      required:
+      - items
+    Item:
+      type: object
+      properties:
+        notificationId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - kind
+      - notificationId
+      - status
+      - title
+    DlqEntryDetail:
+      type: object
+      properties:
+        attemptId:
+          type: string
+          format: uuid
+        notificationId:
+          type: string
+          format: uuid
+        channelType:
+          type: string
+        channelAddressMasked:
+          type: string
+        status:
+          type: string
+        retryCount:
+          type: integer
+          format: int32
+        maxRetry:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        nextAttemptAt:
+          type: string
+          format: date-time
+        vendorMessageId:
+          type: string
+        failureReason:
+          type: string
+        errorClass:
+          type: string
+        renderedTitle:
+          type: string
+        renderedBody:
+          type: string
+        expectedTopic:
+          type: string
+      required:
+      - attemptId
+      - channelAddressMasked
+      - channelType
+      - createdAt
+      - expectedTopic
+      - maxRetry
+      - notificationId
+      - renderedBody
+      - renderedTitle
+      - retryCount
+      - status
+    BucketCount:
+      type: object
+      properties:
+        bucketStart:
+          type: string
+          format: date-time
+        count:
+          type: integer
+          format: int64
+      required:
+      - bucketStart
+      - count
+    DlqStats:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        bucketDuration:
+          type: string
+        totalCount:
+          type: integer
+          format: int64
+        byBucket:
+          type: array
+          items:
+            $ref: "#/components/schemas/BucketCount"
+        byChannel:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeyedCount"
+        byErrorClass:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeyedCount"
+      required:
+      - bucketDuration
+      - byBucket
+      - byChannel
+      - byErrorClass
+      - from
+      - to
+      - totalCount
+    KeyedCount:
+      type: object
+      properties:
+        key:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - key
+    DlqListPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DlqEntryView"
+        nextCursor:
+          type: string
+          format: uuid
+        size:
+          type: integer
+          format: int32
+      required:
+      - items
+      - size
+    DlqBulkJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        operation:
+          type: string
+          enum:
+          - REPLAY
+          - DISCARD
+        state:
+          type: string
+          enum:
+          - RUNNING
+          - SUCCEEDED
+          - PARTIAL_FAILURE
+          - FAILED
+        totalCount:
+          type: integer
+          format: int64
+        processedCount:
+          type: integer
+          format: int64
+        successCount:
+          type: integer
+          format: int64
+        failureCount:
+          type: integer
+          format: int64
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        firstError:
+          type: string
+      required:
+      - failureCount
+      - jobId
+      - operation
+      - processedCount
+      - startedAt
+      - state
+      - successCount
+      - totalCount
