@@ -4,7 +4,7 @@
 [![codecov](https://codecov.io/gh/ssa1004/notification-hub/branch/main/graph/badge.svg)](https://codecov.io/gh/ssa1004/notification-hub)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![JDK](https://img.shields.io/badge/JDK-21-007396?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.x-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.15-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Gradle](https://img.shields.io/badge/Gradle-8.10-02303A?logo=gradle&logoColor=white)](https://gradle.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -22,7 +22,7 @@ Do-Not-Disturb (quiet hours), opt-out, and delivery tracking** into one flow.
                (Outbox + Kafka)          (Resilience4j retry)   (FCM / SES / Twilio / Kakao)
 ```
 
-**Stack** — Kotlin 1.9 on JDK 21 (virtual threads) · Spring Boot 3.4 · PostgreSQL 16 / H2 ·
+**Stack** — Kotlin 1.9 on JDK 21 (virtual threads) · Spring Boot 3.5 · PostgreSQL 16 / H2 ·
 Redis (Lettuce) · Apache Kafka (per-channel topics, Outbox pattern) · Resilience4j · Mustache ·
 Gradle 8 · Docker / Kubernetes (Helm) · Testcontainers.
 
@@ -57,7 +57,7 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
 ## 기술 스택
 
 - **Language**: Kotlin 1.9 (JDK 21 toolchain, virtual threads)
-- **Framework**: Spring Boot 3.4
+- **Framework**: Spring Boot 3.5
 - **Database**: PostgreSQL 16, H2 (local/dev)
 - **Cache / KV**: Redis (Lettuce)
 - **Messaging**: Apache Kafka (channel 별 topic 분리, Outbox 패턴)
