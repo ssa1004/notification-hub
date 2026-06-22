@@ -1,39 +1,35 @@
 # Dependabot — 의존성 / GitHub Actions 버전을 주기적으로 점검해 PR 생성.
 # 보안 패치 누락 (Spring Boot CVE, transitive 취약 라이브러리) 을 사람이 챙기지 않아도
-# 매주 자동으로 올라온다.
+# 매월 자동으로 올라온다.
+# 소음을 줄이기 위해: 점검 주기는 monthly, PR 한도는 5,
+# 각 ecosystem 의 모든 업데이트를 patterns ["*"] 로 한 개의 grouped PR 에 모은다.
 version: 2
 updates:
   # Gradle 멀티모듈 — 루트 build.gradle.kts 의 BOM / 플러그인 + 각 모듈 의존성.
   - package-ecosystem: gradle
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: "09:00"
       timezone: Asia/Seoul
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels:
       - dependencies
       - gradle
     commit-message:
       prefix: "chore(deps)"
     groups:
-      # Spring 생태계는 BOM 으로 버전이 묶여 움직이므로 한 PR 로 모은다.
-      spring:
+      # 이 ecosystem 의 모든 업데이트를 하나의 PR 로 묶는다.
+      gradle-all:
         patterns:
-          - "org.springframework*"
-          - "io.spring.*"
-      # 그 외 patch / minor 도 묶어 PR 수를 줄인다.
-      minor-and-patch:
-        update-types:
-          - minor
-          - patch
+          - "*"
 
   # GitHub Actions — ci.yml / codeql.yml 의 action 버전 (actions/checkout 등).
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: "09:00"
       timezone: Asia/Seoul
@@ -43,13 +39,18 @@ updates:
       - github-actions
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      # 이 ecosystem 의 모든 업데이트를 하나의 PR 로 묶는다.
+      github-actions-all:
+        patterns:
+          - "*"
 
   # Docker — 런타임 / 빌더 베이스 이미지 (eclipse-temurin) 의 패치 태그 갱신.
   # 베이스 이미지 CVE 가 떴을 때 dependabot 이 FROM 핀을 올려주는 PR 을 만든다.
   - package-ecosystem: docker
     directory: "/infrastructure"
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: "09:00"
       timezone: Asia/Seoul
@@ -59,12 +60,17 @@ updates:
       - docker
     commit-message:
       prefix: "chore(docker)"
+    groups:
+      # 이 directory 의 모든 docker 업데이트를 하나의 PR 로 묶는다.
+      docker-infrastructure-all:
+        patterns:
+          - "*"
 
   # Docker — 통합 테스트용 auth-stub (nginx) 베이스 이미지.
   - package-ecosystem: docker
     directory: "/infrastructure/integration/auth-stub"
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: "09:00"
       timezone: Asia/Seoul
@@ -74,3 +80,8 @@ updates:
       - docker
     commit-message:
       prefix: "chore(docker)"
+    groups:
+      # 이 directory 의 모든 docker 업데이트를 하나의 PR 로 묶는다.
+      docker-auth-stub-all:
+        patterns:
+          - "*"
