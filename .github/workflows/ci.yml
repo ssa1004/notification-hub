@@ -122,6 +122,63 @@ jobs:
             echo "::endgroup::"
           done
 
+  openapi-spec:
+    name: OpenAPI spec drift gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+
+      # 기본 프로파일은 H2 인메모리 + mock vendor 이고 Redis / Kafka health indicator 가 꺼져 있어
+      # 외부 인프라(Postgres / Redis / Kafka) 없이 부팅된다 → service container 불필요.
+      # 앱을 백그라운드로 띄우고 readiness 가 200 이 될 때까지 폴링한 뒤, /v3/api-docs.yaml 을
+      # 커밋된 spec 위치로 다시 받아낸다. 그 후 git diff 로 표류를 잡는다.
+      - name: Regenerate OpenAPI spec (zero-infra boot)
+        run: |
+          set -euo pipefail
+          PORT=18099
+          ./gradlew --no-daemon :notification-bootstrap:bootRun --args="--server.port=${PORT}" \
+            > /tmp/nh-boot.log 2>&1 &
+          BOOT_PID=$!
+          echo "boot_pid=${BOOT_PID}"
+
+          ok=0
+          for i in $(seq 1 120); do
+            if ! kill -0 "${BOOT_PID}" 2>/dev/null; then
+              echo "::error::bootRun process exited before serving"; cat /tmp/nh-boot.log; exit 1
+            fi
+            code=$(curl -fsS -o /dev/null -w "%{http_code}" "http://localhost:${PORT}/actuator/health/liveness" 2>/dev/null || echo 000)
+            if [ "${code}" = "200" ]; then ok=1; echo "app live after ${i}s"; break; fi
+            sleep 2
+          done
+          if [ "${ok}" != "1" ]; then
+            echo "::error::app did not become live in time"; cat /tmp/nh-boot.log
+            kill "${BOOT_PID}" 2>/dev/null || true; exit 1
+          fi
+
+          curl -fsS "http://localhost:${PORT}/v3/api-docs.yaml" -o docs/openapi/notification-hub.yaml
+          kill "${BOOT_PID}" 2>/dev/null || true
+          wait "${BOOT_PID}" 2>/dev/null || true
+
+      # 커밋된 spec 과 방금 재생성한 spec 이 다르면 실패 — 코드 변경 후 spec 재생성을 강제한다.
+      - name: Fail on spec drift
+        run: |
+          if ! git diff --exit-code -- docs/openapi/notification-hub.yaml; then
+            echo "::error::docs/openapi/notification-hub.yaml is out of date. Regenerate it (see docs/openapi/README.md) and commit."
+            exit 1
+          fi
+
   integration-test:
     name: Testcontainers IT
     runs-on: ubuntu-latest
