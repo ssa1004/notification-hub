@@ -4,10 +4,10 @@ plugins {
     // Kotlin 버전은 여기서 한 곳에 고정. 실제 적용은 Kotlin 으로 마이그레이션된 모듈만.
     // plugin.spring 은 application / adapter-in / adapter-out 에서 @Service / @Repository /
     // @Component / @RestControllerAdvice 의 자동 open, plugin.jpa 는 @Entity no-arg constructor 합성.
-    kotlin("jvm") version "1.9.25" apply false
-    kotlin("plugin.spring") version "1.9.25" apply false
-    kotlin("plugin.jpa") version "1.9.25" apply false
-    id("org.springframework.boot") version "3.5.15" apply false
+    kotlin("jvm") version "2.4.0" apply false
+    kotlin("plugin.spring") version "2.4.0" apply false
+    kotlin("plugin.jpa") version "2.4.0" apply false
+    id("org.springframework.boot") version "4.1.0" apply false
     // 루트에도 적용한다(apply false 아님). Kover 합산 리포트가 만드는 koverExternalArtifacts
     // 구성은 루트 프로젝트에서 해석(resolve)되는데, 코드 모듈들이 버전 없이 선언한 Spring 의존성
     // (예: org.springframework:spring-tx)의 버전은 spring-boot BOM 이 공급한다. 루트에 BOM 이
@@ -17,7 +17,7 @@ plugins {
     id("org.springdoc.openapi-gradle-plugin") version "1.9.0" apply false
     // Kotlin-native 커버리지 — 루트에 적용하고 코드 모듈을 kover(...) 의존으로 묶어
     // 멀티모듈 합산 리포트(XML/HTML)를 만든다. JaCoCo 대비 Kotlin inline/coroutine 처리에 정확.
-    id("org.jetbrains.kotlinx.kover") version "0.8.3"
+    id("org.jetbrains.kotlinx.kover") version "0.9.8"
 }
 
 allprojects {
@@ -34,7 +34,7 @@ allprojects {
 // 루트에도 import 한다. (subprojects 블록은 서브프로젝트에만 적용되므로 루트에는 별도 필요)
 the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.15")
+        mavenBom("org.springframework.boot:spring-boot-dependencies:4.1.0")
     }
 }
 
@@ -50,7 +50,7 @@ subprojects {
 
     the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
         imports {
-            mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.15")
+            mavenBom("org.springframework.boot:spring-boot-dependencies:4.1.0")
         }
     }
 
