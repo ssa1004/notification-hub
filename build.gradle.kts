@@ -17,7 +17,7 @@ plugins {
     id("org.springdoc.openapi-gradle-plugin") version "1.9.0" apply false
     // Kotlin-native 커버리지 — 루트에 적용하고 코드 모듈을 kover(...) 의존으로 묶어
     // 멀티모듈 합산 리포트(XML/HTML)를 만든다. JaCoCo 대비 Kotlin inline/coroutine 처리에 정확.
-    id("org.jetbrains.kotlinx.kover") version "0.8.3"
+    id("org.jetbrains.kotlinx.kover") version "0.9.8"
 }
 
 allprojects {
