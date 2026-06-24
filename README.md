@@ -75,7 +75,7 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
   처리되면 안 됨. Outbox 패턴 (이벤트를 일단 같은 트랜잭션 안에서 outbox 테이블에 INSERT
   하고 별도 워커가 그걸 읽어 Kafka 로 보내는 구조) 으로 해결.
 - **채널별 처리량 격리** — SMS / 알림톡은 vendor 호출당 비용 / throughput 한도가 PUSH /
-  EMAIL 과 매우 다름. 같은 Kafka topic 에 섞으면 head-of-line blocking. 채널별로 topic /
+  EMAIL 과 매우 다름. 같은 Kafka topic 에 섞으면 head-of-line blocking(= 한 줄로 세우면 맨 앞의 느린 문자/알림톡 하나가 뒤의 빠른 푸시까지 다 막는 현상 — 계산대 맨 앞 손님이 막히면 뒷줄 전체가 멈춤). 채널별로 topic /
   consumer-group / DLQ 정책 분리.
 - **vendor 일시 장애 흡수** — FCM 5xx, SES throttling, 알림톡 timeout. Resilience4j
   `@Retry` (3회) + 도메인 단의 exponential backoff (max 5회) = 최대 8회 재시도 기회.
@@ -100,7 +100,7 @@ push / email / SMS / 카카오 알림톡 등으로 fan-out 하고, retry / DLQ /
 
 | ADR | 결정 |
 |---|---|
-| [0001](docs/adr/0001-hexagonal-architecture.md) | 헥사고날 + 6개 멀티모듈 |
+| [0001](docs/adr/0001-hexagonal-architecture.md) | 헥사고날 + 6개 멀티모듈(= 핵심 로직을 한가운데 두고 DB·Kafka·웹은 콘센트·플러그처럼 갈아끼우게 분리한 구조를, 역할별 6개 Gradle 모듈로 나눈 것) |
 | [0002](docs/adr/0002-channel-fanout-topics.md) | 다채널 fan-out 을 Kafka topic 분리로 |
 | [0003](docs/adr/0003-template-engine-mustache.md) | 템플릿 엔진 Mustache (Thymeleaf / Freemarker 비교) |
 | [0004](docs/adr/0004-idempotency-outbox-retry.md) | Idempotency-Key + Outbox + retry 의 3중 안전망 |

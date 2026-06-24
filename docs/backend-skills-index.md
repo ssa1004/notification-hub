@@ -9,7 +9,7 @@
 |------|---------------|---------|-------|
 | **Outbox 패턴** | [`adapter-out/outbox/OutboxRelay.kt`](../notification-adapter-out/src/main/kotlin/com/example/notification/adapter/out/outbox/OutboxRelay.kt) + `outbox_event` 테이블 | [ADR-0004](adr/0004-idempotency-outbox-retry.md) | 발송 등록 트랜잭션 commit 과 Kafka publish 를 한 트랜잭션으로 — DB rollback 시 phantom event 0 |
 | **`SELECT … FOR UPDATE SKIP LOCKED`** | [`OutboxEventJpaRepository.findPending`](../notification-adapter-out/src/main/kotlin/com/example/notification/adapter/out/persistence/repository/OutboxEventJpaRepository.kt) | ADR-0004 | 여러 relay 인스턴스가 같은 PENDING row 를 겹쳐 발행하지 않게 행 잠금 |
-| **채널별 topic fan-out** | per-channel Kafka topic (`notification.delivery.{channel}`) + consumer-group 분리 | [ADR-0002](adr/0002-channel-fanout-topics.md) | SMS/알림톡(저throughput·고비용)이 PUSH/EMAIL 을 head-of-line blocking 하지 않게 격리 |
+| **채널별 topic fan-out** | per-channel Kafka topic (`notification.delivery.{channel}`) + consumer-group 분리 | [ADR-0002](adr/0002-channel-fanout-topics.md) | SMS/알림톡(저throughput·고비용)이 PUSH/EMAIL 을 head-of-line blocking(= 한 줄로 세우면 맨 앞의 느린 건이 뒤의 빠른 건까지 다 막는 현상) 하지 않게 격리 |
 | **at-least-once + consumer dedup** | relay 발행 / consumer 측 `eventId` dedup | ADR-0004 | publish-then-mark 사이 crash 로 중복 발행 가능 → consumer 가 멱등 흡수 |
 
 → 이론: `dev-lab/kafka` (topic/partition/consumer-group), `dev-lab/cdc` (Outbox vs Debezium CDC), `dev-lab/postgresql` (`FOR UPDATE SKIP LOCKED` 잠금 모델)
@@ -67,7 +67,7 @@
 
 | 패턴 | 이 레포 어디서 | 한 줄 |
 |------|---------------|-------|
-| **헥사고날 + 6개 멀티모듈** | `notification-domain / application / adapter-in / adapter-out / bootstrap` | [ADR-0001](adr/0001-hexagonal-architecture.md) — 의존 방향: adapter → application → domain |
+| **헥사고날 + 6개 멀티모듈**(= 핵심 로직을 한가운데 두고 DB·Kafka·웹은 콘센트·플러그처럼 갈아끼우게 분리한 구조를, 역할별 모듈로 나눈 것) | `notification-domain / application / adapter-in / adapter-out / bootstrap` | [ADR-0001](adr/0001-hexagonal-architecture.md) — 의존 방향: adapter → application → domain |
 | **Virtual Threads (Java 21)** | application.yml `spring.threads.virtual.enabled: true` | vendor 호출 다수 동시 처리 — blocking I/O 를 OS thread 점유 없이 (단, JDBC 는 여전히 OS thread → HikariCP 풀 산정에 반영) |
 | **vendor adapter 공통 port** | [`DeliveryGateway.kt`](../notification-application/src/main/kotlin/com/example/notification/application/port/out/DeliveryGateway.kt) + 채널별 Mock client | [ADR-0007](adr/0007-vendor-adapter-port.md) — port 1개 + 채널별 adapter, SDK 교체가 도메인에 안 샘 |
 | **템플릿 엔진 (Mustache)** | template 도메인 + 렌더링 | [ADR-0003](adr/0003-template-engine-mustache.md) — locale × channel 별 본문 분리, ko-kr fallback |
