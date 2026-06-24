@@ -68,3 +68,12 @@ APNs `Unregistered` 등) 을 catch 하면:
   매핑되도록 `DeliveryGateway` 분기 — 현재 PUSH 가 PUSH 라는 단일 ChannelType 인 건 유지.
 - 100+ device 사용자 등 비정상 케이스 — 등록 시 사용자당 device 수 상한 + 가장 오래된 것부터
   자동 retire.
+
+## 용어 풀이 (쉽게)
+
+- **multi-device fan-out** — 한 사용자의 핸드폰·태블릿·웹 등 켜져 있는 모든 기기로 같은 푸시를 동시에 펼쳐 보내는 것. 어느 기기를 보고 있든 OTP를 받게 한다.
+- **token / token rotation (토큰 회전)** — token은 푸시를 보낼 기기의 '주소표'. OS가 이따금 이 주소표를 새로 발급(rotation)하므로 옛 주소로 보내면 실패한다.
+- **stale token / NOT_REGISTERED (만료된 토큰)** — 더 이상 유효하지 않은 옛 주소표. vendor가 `NOT_REGISTERED`로 거절하면 다음부터 그 기기는 자동으로 발송 대상에서 뺀다.
+- **bloat (불필요한 비대)** — 잘못된 토큰·죽은 기기 기록이 자꾸 쌓여 DB와 메시지가 쓸데없이 불어나는 것.
+- **Web Push / Service Worker** — 앱이 아니라 웹 브라우저로 푸시를 보내는 기술. Service Worker는 브라우저 뒤에서 알림을 대신 받아주는 작은 백그라운드 프로그램.
+- **FK (Foreign Key, 외래 키)** — 한 테이블의 줄이 다른 테이블의 어느 줄을 가리키는지 묶어주는 연결 고리. 알림과 기기 정보를 이어 붙일 때 쓴다.

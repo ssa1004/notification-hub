@@ -92,3 +92,14 @@ HMAC 입력에 들어가서 같은 body 라도 timestamp 가 다르면 서명이
 
 - ADR (예정): vendor secret rotation + grace window
 - ADR (예정): mTLS 도입 — 금융 / KYC 통합 시
+
+## 용어 풀이 (쉽게)
+
+- **webhook (웹훅)** — vendor가 "전송 결과 나왔어요" 하고 우리 쪽 주소(URL)로 먼저 알려주는 콜백. 우리가 물어보는 게 아니라 저쪽이 일이 끝나면 알아서 두드린다.
+- **HMAC 서명 (Hash-based MAC)** — vendor와 우리만 아는 비밀(secret)로 메시지에 찍는 '봉인 도장'. 받은 쪽이 같은 비밀로 도장을 다시 찍어보고 맞으면 진짜, 다르면 가짜로 판별한다.
+- **secret (시크릿)** — vendor와 우리만 공유하는 비밀 열쇠 문자열. HMAC은 이 열쇠 자체는 네트워크로 보내지 않고 '도장 결과'만 보낸다.
+- **replay attack (재전송 공격)** — 예전에 한 번 통했던 진짜 요청을 가로채 그대로 다시 보내 시스템을 속이는 공격. 5분 시간 창과 timestamp로 막는다.
+- **timing-safe 비교 / side channel (타이밍 안전 비교·부채널)** — 도장을 맞춰볼 때 걸리는 시간을 늘 똑같이 맞춰, 응답 속도 차이로 정답을 한 글자씩 알아내는 새는 틈(side channel)을 없애는 것.
+- **fail-closed (고장 시 잠금)** — secret이 없거나 검증이 애매하면 '일단 막는' 안전 우선 정책. 반대로 '고장 나면 통과'는 fail-open이라 부른다.
+- **IP allowlist / mTLS (대안 보안)** — IP allowlist는 정해진 IP만 통과시키는 명단(주소가 자주 바뀌어 탈락), mTLS는 양쪽이 서로 인증서로 신원을 증명하는 더 강한 방식(운영 비용이 큼).
+- **secret rotation (시크릿 교체)** — 유출 위험에 대비해 비밀 열쇠를 주기적으로 새것으로 갈아끼우는 운영. 옛 열쇠도 잠깐 같이 받아주는 유예(grace window)가 필요하다.

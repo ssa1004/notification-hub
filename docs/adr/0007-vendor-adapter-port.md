@@ -52,3 +52,11 @@ vendor 호출의 retry / circuit breaker 는 adapter 단의 `@Retry(name="vendor
   enum 키 외 전략 객체로 확장 (예: device 의 OS 보고 결정)
 - 비동기 호출 중심 (vendor 에 비동기 send + 응답 callback) 으로 가야 하면 dispatch 시그니처를
   `CompletableFuture<String>` 으로 변경
+
+## 용어 풀이 (쉽게)
+
+- **out-port (아웃 포트)** — 핵심 로직이 바깥(vendor)을 부를 때 쓰는 '콘센트' 인터페이스. 안쪽은 콘센트 모양만 알고, 어느 vendor 플러그가 꽂히는지는 몰라도 된다.
+- **fail-fast (빠른 실패)** — 잘못된 설정을 발견하면 조용히 넘어가지 않고 즉시 멈춰 알리는 것. 같은 채널 gateway가 둘이면 바로 에러를 던져 운영 중 사고를 예방한다.
+- **config drift (설정 어긋남)** — 의도와 다르게 설정이 슬그머니 틀어진 상태(예: 같은 채널에 vendor가 둘 등록됨). fail-fast로 이런 어긋남을 부팅 때 잡는다.
+- **서킷 브레이커 (Circuit Breaker)** — vendor 호출이 자꾸 실패하면 두꺼비집처럼 잠시 회선을 끊어 즉시 실패시키고, 죽은 서버를 계속 두드리는 걸 막는 것.
+- **vendor SDK** — FCM·SES·Twilio 같은 외부 업체가 제공하는 호출용 라이브러리. 무겁고 업체마다 사용법이 달라, 한 클래스 안에만 가둔다.

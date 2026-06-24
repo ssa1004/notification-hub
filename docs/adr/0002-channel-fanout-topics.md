@@ -33,3 +33,12 @@ B) **채널별 topic** — `notification.delivery.push`, `notification.delivery.
 ## 다시 검토할 시점
 채널이 10개 이상으로 늘어나거나, 채널당 throughput 차이가 크지 않게 평준화되면 단일 topic +
 헤더 라우팅 으로 회귀를 검토.
+
+## 용어 풀이 (쉽게)
+
+- **fan-out (팬아웃)** — 알림 한 건을 여러 채널(푸시/이메일/문자/카톡)로 펼쳐 보내는 것. 선풍기 날개처럼 하나가 여러 갈래로 퍼진다.
+- **Kafka topic / consumer-group** — topic은 메시지가 줄지어 흐르는 '컨베이어 벨트', consumer-group은 그 벨트에서 물건을 집어가는 '한 팀의 일꾼들'. 채널마다 벨트와 팀을 따로 두면 서로 안 막힌다.
+- **head-of-line blocking (줄 맨 앞 막힘)** — 계산대 맨 앞 손님이 결제가 안 돼 뒷줄 전체가 멈추는 상황. 느린 SMS가 같은 줄의 빠른 PUSH까지 못 가게 막는다.
+- **partition key (파티션 키)** — 같은 키를 가진 메시지는 항상 같은 줄로 보내 순서를 지키는 분류 기준. 여기선 `notificationId`라 같은 알림은 보낸 순서대로 처리된다.
+- **lag (컨슈머 lag)** — 일꾼이 못 따라잡고 밀린 메시지의 양. 처리할 줄이 얼마나 길게 쌓였는지를 뜻한다.
+- **throttling (스로틀링) / SLA** — throttling은 vendor가 "분당 이만큼만 받을게" 하고 속도를 조이는 것. SLA는 "이 정도 품질·속도는 보장한다"는 약속.

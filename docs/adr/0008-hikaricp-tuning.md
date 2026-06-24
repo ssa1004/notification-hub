@@ -51,3 +51,12 @@ prod profile 의 `maximum-pool-size` / `minimum-idle` 은 ENV 로 오버라이�
 - DB 측 firewall / `wait_timeout` 가 변경되면 `max-lifetime` 도 같이 조정.
 - 일반 read 트래픽이 10배 늘면 read replica + 별도 datasource 분리 검토 (`@Transactional
   (readOnly=true)` 라우팅).
+
+## 용어 풀이 (쉽게)
+
+- **HikariCP / connection pool (커넥션 풀)** — DB 연결을 매번 새로 만들지 않고 미리 몇 개 만들어 돌려쓰는 '연결 대여소'. HikariCP는 그걸 관리하는 도구 이름.
+- **pool 고갈 (pool exhaustion)** — 빌려줄 연결이 다 떨어져 새 요청이 줄 서서 기다리다 결국 실패하는 상태. 우산 대여소에 우산이 동나 다음 손님이 발이 묶이는 셈.
+- **connection leak (커넥션 누수)** — 빌린 연결을 다 쓰고도 반납을 깜빡해 대여소가 야금야금 비는 것. leak detection은 일정 시간 안 돌아온 연결을 추적해 범인을 알려준다.
+- **fail-fast (빠른 실패)** — DB가 죽었을 때 30초씩 멍하니 기다리지 않고 3초 안에 곧장 실패로 알려, 호출 측이 빨리 재시도하게 하는 것.
+- **max-lifetime** — 연결 하나의 최대 수명. 방화벽이나 DB가 오래된 연결을 먼저 끊어버리기 전에, 우리가 먼저 갈아끼워 '끊긴 연결을 잡고 있다 터지는' 사고를 막는다.
+- **read replica (읽기 복제본)** — 읽기 요청만 받는 DB 사본. 조회가 폭증하면 원본은 쓰기에 집중하고 읽기는 복제본으로 돌려 부담을 나눈다.

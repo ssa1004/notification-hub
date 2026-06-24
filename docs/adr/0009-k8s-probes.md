@@ -55,3 +55,11 @@ health:
   가 그 의존도 체크해야 함. 의존 종류가 5개 넘으면 Strategy pattern 으로 분리.
 - multi-cluster (active-active) 로 가면 readiness 가 단순 ping 이 아니라 cross-cluster
   consensus 까지 봐야 함 — Raft/etcd 합의 상태 등.
+
+## 용어 풀이 (쉽게)
+
+- **probe (프로브)** — 쿠버네티스가 주기적으로 던지는 '건강 체크' 질문. 대답을 보고 트래픽을 줄지, 다시 살릴지를 정한다.
+- **startup / readiness / liveness probe** — startup은 '부팅 다 됐니?', readiness는 '손님 받을 준비 됐니?', liveness는 '아예 죽은 건 아니지?'를 묻는 세 가지 검사. 역할을 나눠 부팅 중인 pod를 실수로 죽이지 않게 한다.
+- **cascade 장애 (연쇄 장애)** — 한 곳의 지연·죽음이 도미노처럼 옆으로 번지는 장애. Kafka가 잠깐 끊겼다고 모든 pod를 동시에 재기동하면 복구가 더 늦어진다.
+- **active-active (액티브-액티브)** — 여러 클러스터를 동시에 켜놓고 둘 다 실제 트래픽을 받게 하는 구성. 한쪽이 죽어도 다른 쪽이 계속 일한다.
+- **consensus / Raft·etcd (합의)** — 여러 서버가 "지금 상태가 뭐다"에 다수결로 한목소리를 내는 알고리즘. 서로 자기가 맞다고 우기는 혼선을 막는다.

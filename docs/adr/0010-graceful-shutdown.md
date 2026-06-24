@@ -71,3 +71,13 @@ terminationGracePeriodSeconds: 30
   `timeout-per-shutdown-phase` 와 `terminationGracePeriodSeconds` 같이 늘림.
 - spot instance / preemptible VM 으로 가면 grace 30s 도 보장 안 될 수 있음 → Pod 가 죽어도
   처리되도록 outbox / kafka offset 을 100% 신뢰해야 함 (현재 설계와 부합).
+
+## 용어 풀이 (쉽게)
+
+- **graceful shutdown (우아한 종료)** — 서버를 끌 때 갑자기 전원을 뽑지 않고, 처리 중인 일을 마저 끝낸 뒤 천천히 내려가는 것. 식당이 새 손님은 안 받되 안에 있는 손님 식사는 끝까지 받는 셈.
+- **SIGTERM / SIGKILL** — SIGTERM은 "정리하고 끝내"라는 부드러운 종료 신호, SIGKILL은 "지금 당장 강제 종료". 먼저 SIGTERM을 주고 시간이 지나도 안 끝나면 SIGKILL을 준다.
+- **in-flight 요청 (처리 중 요청)** — 지금 한창 처리되고 있는 요청. 종료 중이라도 이건 끊지 않고 끝까지 마친다.
+- **drain (드레인) / preStop** — 종료할 pod를 트래픽 분배 명단에서 먼저 빼내(drain) 새 요청이 안 오게 한 뒤 끄는 것. preStop의 짧은 sleep이 그 시간을 벌어준다.
+- **offset commit (오프셋 커밋)** — Kafka에서 "여기까지 읽고 처리했다"고 책갈피를 찍는 것. 찍기 전에 죽으면 그 메시지를 다시 처리하게 된다.
+- **rolling deploy / maxSurge (무중단 배포)** — 새 버전 pod를 먼저 띄워 준비되면 옛 pod를 하나씩 교체하는 배포. maxSurge는 그때 잠깐 더 띄울 수 있는 여유분 개수.
+- **spot instance / preemptible VM (스팟 인스턴스)** — 값이 싼 대신 클라우드가 예고 없이 회수해 갈 수 있는 임시 서버. 갑자기 죽어도 일이 안 새도록 설계해야 한다.
