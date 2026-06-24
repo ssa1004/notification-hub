@@ -3,6 +3,7 @@ package com.example.notification.adapter.out.redis
 import com.example.notification.application.port.out.IdempotencyStore
 import com.example.notification.domain.shared.IdempotencyKey
 import java.time.Duration
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component
  * 같은 키가 동시에 들어와도 한 쪽만 true 반환.
  */
 @Component
+@ConditionalOnProperty(name = ["notification.redis.enabled"], havingValue = "true", matchIfMissing = true)
 class RedisIdempotencyStore(
     private val redis: StringRedisTemplate,
 ) : IdempotencyStore {

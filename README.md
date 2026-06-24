@@ -39,10 +39,11 @@ Testcontainers `e2e-tests` are already Kotlin, while the **domain / application 
 Kotlin is tracked under [향후 개선 사항](#향후-개선-사항). The badges above pin Kotlin/JDK/Spring
 versions, not test-suite language.
 
-**Run it** — `make run` boots the app on `:8080` with H2 + mock vendors. The process itself
-needs no external infra to start, **but the send path (`POST /api/v1/notifications`) needs Redis**
-— idempotency uses Redis `SETNX` and rate limiting uses a Redis Lua script. So for the functional
-curl walkthrough, run `make up` first (Redis + Kafka). See [실행 방법](#실행-방법) for the prod
+**Run it** — `make run` boots the app on `:8080` with **zero external infrastructure**: H2,
+mock vendors, and **in-memory idempotency + rate limiting** (the default profile swaps the Redis
+`SETNX` / Lua adapters for `@ConditionalOnProperty` in-memory ones), so `POST /api/v1/notifications`
+works end-to-end with no Docker. The `prod` profile flips `notification.redis.enabled=true` to use
+the real Redis (distributed) + Kafka path. See [실행 방법](#실행-방법) for the prod
 profile and details.
 
 ---
@@ -220,15 +221,16 @@ graph LR
 
 > `make help` 로 전체 명령을 볼 수 있습니다. 가장 빠른 길:
 > ```bash
-> make run                       # H2 + Mock vendor 로 부팅 (:8080). 부팅엔 외부 인프라 0,
->                                 #   단 POST /api/v1/notifications 기능 경로는 Redis 필요(아래 주)
+> make run                       # H2 + Mock vendor + 인메모리 멱등성/rate limit 로 단독 실행 (:8080, 외부 의존 0)
 > make up                        # prod 인프라 (Postgres/Redis/Kafka/Kafka-UI)
 > make run-prod                  # 다른 셸에서 prod 프로파일로 앱 실행
 > make demo                      # cross-repo 통합 데모 한 사이클
 > ```
 
-H2 + Mock vendor 로 외부 인프라 없이 **부팅**합니다. 단, 알림 전송 기능 경로(`POST /api/v1/notifications`)는
-멱등성(Redis SETNX)과 rate limit(Redis Lua)에 Redis 를 쓰므로, 기능 데모는 `make up`(Redis/Kafka) 후 실행하세요.
+H2 + Mock vendor + **인메모리 멱등성/rate limit** 로 외부 인프라 없이 실행됩니다 — `POST /api/v1/notifications`
+까지 Redis·Kafka 없이 동작합니다. 기본 프로필이 `@ConditionalOnProperty` 로 Redis 어댑터(SETNX/Lua) 대신
+인메모리 어댑터를 쓰기 때문입니다(단일 인스턴스·비영속). 분산/영속이 필요한 `prod` 프로필은
+`notification.redis.enabled=true` 로 실제 Redis 경로를 사용합니다.
 
 ```bash
 ./gradlew :notification-bootstrap:bootRun

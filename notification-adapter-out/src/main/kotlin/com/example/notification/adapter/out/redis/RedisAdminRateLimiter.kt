@@ -4,6 +4,7 @@ import com.example.notification.application.port.out.AdminRateLimiter
 import com.example.notification.domain.shared.RateLimitDecision
 import java.util.Collections
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Component
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component
  * 별도 scope 로 더 낮게 잡을 수 있도록 분리.
  */
 @Component
+@ConditionalOnProperty(name = ["notification.redis.enabled"], havingValue = "true", matchIfMissing = true)
 class RedisAdminRateLimiter(
     private val redis: StringRedisTemplate,
 ) : AdminRateLimiter {

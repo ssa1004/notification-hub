@@ -8,6 +8,7 @@ import java.time.Duration
 import java.util.Collections
 import java.util.EnumMap
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Component
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Component
  * 한도는 채널별 차등 — push/email 은 분당 30, sms/알림톡 은 분당 5 (vendor 비용 고려).
  */
 @Component
+@ConditionalOnProperty(name = ["notification.redis.enabled"], havingValue = "true", matchIfMissing = true)
 class RedisRateLimiter(
     private val redis: StringRedisTemplate,
 ) : RateLimiter {

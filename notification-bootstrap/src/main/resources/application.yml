@@ -88,6 +88,12 @@ management:
 readiness:
   probe-interval-ms: 5000
 
+# 로컬/데모 기본 = Redis 없이(zero-infra): 멱등성(SETNX)·rate limit(Lua)을 인메모리 어댑터로 처리.
+# prod/test 프로필에서 true 로 켜 Redis 어댑터 사용 (NOTIFICATION_REDIS_ENABLED 로도 토글).
+notification:
+  redis:
+    enabled: ${NOTIFICATION_REDIS_ENABLED:false}
+
 # 운영 endpoint (/api/v1/admin/**) 보호용 token. 미설정이면 모든 admin 요청 거절 (default-deny).
 # 운영 환경은 ENV 로 주입 (Secret 권장).
 admin:
@@ -206,6 +212,11 @@ webhook:
     twilio: ${WEBHOOK_SECRET_TWILIO:}
     kakao: ${WEBHOOK_SECRET_KAKAO:}
 
+# prod 는 분산/영속이라 Redis 어댑터(SETNX/Lua) 사용.
+notification:
+  redis:
+    enabled: true
+
 ---
 # test 프로파일 — Testcontainers / 단위 통합용. leak detection 끔 (테스트는 종료 시점에
 # Spring context tear-down 이 connection close 보다 늦으면 false positive 가 시끄러움).
@@ -222,3 +233,8 @@ spring:
       idle-timeout: 600000
       leak-detection-threshold: 0
       pool-name: notification-hub-pool-test
+
+# e2e 는 Testcontainers Redis 를 띄워 실제 Redis 어댑터 경로를 검증한다.
+notification:
+  redis:
+    enabled: true
