@@ -39,9 +39,11 @@ Testcontainers `e2e-tests` are already Kotlin, while the **domain / application 
 Kotlin is tracked under [향후 개선 사항](#향후-개선-사항). The badges above pin Kotlin/JDK/Spring
 versions, not test-suite language.
 
-**Run it** — `make run` boots the app on `:8080` with H2 + mock vendors and **zero external
-dependencies**. See [실행 방법](#실행-방법) for the prod profile (Postgres / Redis / Kafka) and the
-curl walkthrough.
+**Run it** — `make run` boots the app on `:8080` with H2 + mock vendors. The process itself
+needs no external infra to start, **but the send path (`POST /api/v1/notifications`) needs Redis**
+— idempotency uses Redis `SETNX` and rate limiting uses a Redis Lua script. So for the functional
+curl walkthrough, run `make up` first (Redis + Kafka). See [실행 방법](#실행-방법) for the prod
+profile and details.
 
 ---
 
@@ -218,13 +220,15 @@ graph LR
 
 > `make help` 로 전체 명령을 볼 수 있습니다. 가장 빠른 길:
 > ```bash
-> make run                       # H2 + Mock vendor 로 단독 실행 (:8080, 외부 의존 0)
+> make run                       # H2 + Mock vendor 로 부팅 (:8080). 부팅엔 외부 인프라 0,
+>                                 #   단 POST /api/v1/notifications 기능 경로는 Redis 필요(아래 주)
 > make up                        # prod 인프라 (Postgres/Redis/Kafka/Kafka-UI)
 > make run-prod                  # 다른 셸에서 prod 프로파일로 앱 실행
 > make demo                      # cross-repo 통합 데모 한 사이클
 > ```
 
-H2 + Mock vendor 로 외부 의존성 없이 실행할 수 있습니다.
+H2 + Mock vendor 로 외부 인프라 없이 **부팅**합니다. 단, 알림 전송 기능 경로(`POST /api/v1/notifications`)는
+멱등성(Redis SETNX)과 rate limit(Redis Lua)에 Redis 를 쓰므로, 기능 데모는 `make up`(Redis/Kafka) 후 실행하세요.
 
 ```bash
 ./gradlew :notification-bootstrap:bootRun

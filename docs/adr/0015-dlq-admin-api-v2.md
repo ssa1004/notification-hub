@@ -52,8 +52,9 @@ ADR-0012 의 3개 endpoint 는 그대로 유지 (path / 응답 호환). 다음 e
 ### 권한 / 안전
 - 권한 — ADR-0012 의 `AdminAuthFilter` + `AdminContext` 그대로. (Spring Security 미도입 결정
   유지 — ADR-0012 의 장단점 그대로 적용.)
-- audit — `AuditAction` = `DLQ_REPLAY` / `DLQ_DISCARD` / `DLQ_BULK_REPLAY_DRYRUN`
-  / `DLQ_BULK_REPLAY_START` / `DLQ_BULK_REPLAY_FINISH` / `DLQ_BULK_DISCARD_*` 6종.
+- audit — enum 타입 없이 `AuditLogger.log(actor, action, data)` 의 `action` 문자열 리터럴로
+  기록: `"DLQ_REPLAY"` / `"DLQ_DISCARD"` / `"DLQ_BULK_REPLAY_DRYRUN"`
+  / `"DLQ_BULK_REPLAY_START"` / `"DLQ_BULK_REPLAY_FINISH"` / `"DLQ_BULK_DISCARD_*"` 6종.
 - rate limit — 호출자 IP × scope 별 token bucket (Redis Lua, ADR-0006 의 token bucket 패턴
   재사용). 기본 분당 60. scope = `dlq.read` / `dlq.write` / `dlq.bulk` 셋. 초과 시 HTTP 429 +
   `Retry-After` 헤더.
