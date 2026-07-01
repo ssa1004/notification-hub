@@ -55,7 +55,8 @@ class RedisRateLimiter(
         val current = result[0]
         val ttl = result[1]
         if (current > limit) {
-            return RateLimitDecision.deny(ttl)
+            // Redis PTTL 은 -1/-2 를 줄 수 있어 음수 retryAfter 를 막는다(다른 경로와 동일 방어).
+            return RateLimitDecision.deny(if (ttl < 0) windowMs else ttl)
         }
         return RateLimitDecision.allow(maxOf(0L, limit - current))
     }

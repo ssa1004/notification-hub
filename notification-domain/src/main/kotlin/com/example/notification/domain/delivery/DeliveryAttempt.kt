@@ -177,7 +177,7 @@ class DeliveryAttempt(
         /**
          * Exponential backoff with jitter. base 1s, factor 2, jitter ±25%, cap 60s.
          *
-         * retry=1 → 1s, retry=2 → 2s, retry=3 → 4s, retry=4 → 8s, retry=5 → 16s (cap 적용)
+         * retry=1 → 1s, retry=2 → 2s, retry=3 → 4s, retry=4 → 8s (마지막 재시도). cap 60s 는 retry≥7 에서 적용.
          */
         @JvmStatic
         fun backoffFor(retry: Int): Duration {

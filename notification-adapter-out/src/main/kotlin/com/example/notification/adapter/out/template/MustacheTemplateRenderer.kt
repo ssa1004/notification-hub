@@ -19,7 +19,13 @@ import org.springframework.stereotype.Component
 @Component
 class MustacheTemplateRenderer : TemplateRenderer {
 
-    private val factory: MustacheFactory = DefaultMustacheFactory()
+    // SMS/PUSH/KAKAO 는 평문 채널이라 HTML 이스케이프를 끈다. 기본 factory 는 {{var}} 치환 시
+    // &,<,>,\" 를 이스케이프해 payload 값을 훼손한다(예: "Tom & Jerry" → "Tom &amp; Jerry").
+    private val factory: MustacheFactory = object : DefaultMustacheFactory() {
+        override fun encode(value: String, writer: java.io.Writer) {
+            writer.write(value)
+        }
+    }
 
     override fun render(template: Template, payload: Map<String, String>): TemplateRenderer.Rendered {
         val title = renderOne(template.titleTemplate, payload, "title")
