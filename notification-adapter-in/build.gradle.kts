@@ -18,7 +18,7 @@ dependencies {
 
     // OpenAPI 문서 — Spring Boot 3.5(Spring Framework 6.2) 호환 라인. 2.6.x 는 Framework 6.1 대상이라
     // 6.2 에서 제거된 ControllerAdviceBean(Object) 생성자를 호출해 /v3/api-docs 가 NoSuchMethodError 로 500.
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
 
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     // Kotlin null-safety 와 호환되는 Jackson module — Kotlin data class 의 non-null 필드를 인식해
@@ -31,7 +31,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.kafka:spring-kafka-test")
     // Mockito Kotlin helpers — any() / whenever / verify 의 Kotlin friendly DSL.
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.3.0")
 }
 
 kotlin {
