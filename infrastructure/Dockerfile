@@ -1,5 +1,5 @@
 # ─── build stage ─────────────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM eclipse-temurin:25-jdk-alpine AS builder
 WORKDIR /workspace
 
 # Gradle wrapper + 빌드 스크립트만 먼저 복사 — 의존성 캐시 hit 향상
@@ -22,7 +22,7 @@ COPY notification-bootstrap notification-bootstrap
 RUN ./gradlew --no-daemon :notification-bootstrap:bootJar -x test
 
 # ─── runtime stage ────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 # OCI image labels — 레지스트리 / 스캐너 / 배포 도구가 출처를 추적할 수 있게.
